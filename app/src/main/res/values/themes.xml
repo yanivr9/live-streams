@@ -1,0 +1,14 @@
+<resources>
+    <color name="desk_bg">#0E1113</color>
+
+    <style name="Theme.StreamDesk" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/desk_bg</item>
+        <item name="android:colorAccent">#FF9F1C</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Theme.StreamDesk.Player">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

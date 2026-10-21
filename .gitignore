@@ -1,0 +1,9 @@
+*.apk
+*.iml
+.gradle/
+.idea/
+.kotlin/
+StreamDesk-debug.apk
+app/src/test/java/com/streamdesk/app/RealDataTest.kt
+build/
+local.properties

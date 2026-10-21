@@ -1,0 +1,742 @@
+package com.streamdesk.app
+
+import android.app.PictureInPictureParams
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Rational
+import android.view.View
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import android.view.KeyEvent
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.QueryStats
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.rtmp.RtmpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.dash.manifest.DashManifest
+import androidx.media3.exoplayer.hls.HlsManifest
+import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.ui.PlayerView
+import androidx.media3.ui.TrackSelectionDialogBuilder
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+
+private data class Status(val text: String, val isError: Boolean = false)
+
+private data class Stats(
+    val format: String = "–",
+    val resolution: String = "–",
+    val codec: String = "–",
+    val bitrate: String = "–",
+    val buffer: String = "–",
+    val dropped: String = "–",
+    val latency: String = "–",
+)
+
+@OptIn(UnstableApi::class)
+class PlayerActivity : ComponentActivity() {
+    private lateinit var store: ChannelStore
+    private lateinit var player: ExoPlayer
+    private lateinit var http: DefaultHttpDataSource.Factory
+    private lateinit var mediaSources: DefaultMediaSourceFactory
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var queue: List<Channel> = emptyList()
+    private var index = 0
+    private var requestedFormat = StreamFormat.Auto
+    private var detectedFormat = StreamFormat.Auto
+    private var tryingFormat = StreamFormat.Auto
+    private var retries = 0
+    private var clientAttempt = 0   // index into CLIENT_USER_AGENTS for channels without their own
+    private var reachedReady = false
+    private var droppedFrames = 0
+    private var pausedByStop = false
+
+    // Compose state
+    private var current by mutableStateOf<Channel?>(null)
+    private var status by mutableStateOf<Status?>(null)
+    private var stats by mutableStateOf(Stats())
+    private var isLive by mutableStateOf(false)
+    private var inPip by mutableStateOf(false)
+    private var controlsVisible by mutableStateOf(true)
+    private var showStats by mutableStateOf(false)
+    private var banner by mutableStateOf<String?>(null)   // "12 · channel name", shown briefly after switching channel
+    private val bannerHandler = Handler(Looper.getMainLooper())
+    private val hideBanner = Runnable { banner = null }
+    private var hasQualities by mutableStateOf(false)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        store = ChannelStore.get(this)
+
+        http = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setUserAgent(VLC_USER_AGENT)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(20_000)
+        mediaSources = DefaultMediaSourceFactory(DefaultDataSource.Factory(this, http))
+
+        player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSources)
+            .setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
+                /* handleAudioFocus = */ true,
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+        // Always start on the best picture the stream and this phone's decoder offer, not whatever the connection speed suggests
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setForceHighestSupportedBitrate(true)
+            .setViewportSize(Int.MAX_VALUE, Int.MAX_VALUE, false)
+            .build()
+        player.addListener(playerListener)
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
+                this@PlayerActivity.droppedFrames += droppedFrames
+            }
+        })
+
+        goFullscreen()
+        addOnPictureInPictureModeChangedListener { inPip = it.isInPictureInPictureMode }
+        setContent { StreamDeskTheme { PlayerScreen() } }
+
+        if (!loadFromIntent(intent)) {
+            finish()
+            return
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    updateStats()
+                    delay(1000)
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        loadFromIntent(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (pausedByStop) player.play()
+        pausedByStop = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Keep playing in picture-in-picture; pause when the app really goes to the background
+        if (!isInPictureInPictureMode && player.isPlaying) {
+            player.pause()
+            pausedByStop = true
+        }
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        bannerHandler.removeCallbacksAndMessages(null)
+        if (::player.isInitialized) player.release()
+        super.onDestroy()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Android 12+ enters PiP on its own via setAutoEnterEnabled
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player.isPlaying) enterPip()
+    }
+
+    // ---------- loading ----------
+
+    private fun loadFromIntent(intent: Intent): Boolean {
+        val passed = intent.getStringArrayListExtra(EXTRA_QUEUE)?.map { Channel.fromJson(JSONObject(it)) }
+        val start: Int
+        queue = when {
+            !passed.isNullOrEmpty() -> {
+                start = intent.getIntExtra(EXTRA_INDEX, 0).coerceIn(passed.indices)
+                passed
+            }
+            intent.action == Intent.ACTION_VIEW && intent.data != null -> {
+                start = 0
+                listOf(channelFor(intent.data.toString()))
+            }
+            intent.action == Intent.ACTION_SEND -> {
+                val link = intent.getStringExtra(Intent.EXTRA_TEXT)?.let { LINK.find(it)?.value } ?: return false
+                start = 0
+                listOf(channelFor(link))
+            }
+            else -> return false
+        }
+        requestedFormat = StreamFormat.entries.getOrElse(intent.getIntExtra(EXTRA_FORMAT, 0)) { StreamFormat.Auto }
+        play(start)
+        return true
+    }
+
+    private fun channelFor(url: String) = store.find(url) ?: Channel(url, nameFromUrl(url))
+
+    private fun play(i: Int) {
+        index = i
+        val ch = queue[i]
+        current = ch
+        retries = 0
+        clientAttempt = 0
+        reachedReady = false
+        droppedFrames = 0
+        isLive = false
+        // A quality chosen by hand on the previous channel doesn't carry over: every channel opens on its best
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).build()
+        detectedFormat = detectFormat(ch.url)
+        tryingFormat = if (requestedFormat != StreamFormat.Auto) requestedFormat else detectedFormat
+        store.markPlayed(ch)
+        AppLog.i("player", "Open \"${ch.name}\": ${ch.url}")
+        load()
+    }
+
+    private fun load() {
+        val ch = queue[index]
+        handler.removeCallbacksAndMessages(null)
+        val scheme = Uri.parse(ch.url).scheme?.lowercase().orEmpty()
+        if (scheme in UNSUPPORTED_SCHEMES) {
+            player.stop()
+            status = Status("${scheme.uppercase()} links aren't supported yet. Re-stream it as HLS or RTSP, or open it in VLC.", isError = true)
+            return
+        }
+        http.setUserAgent(ch.userAgent.ifBlank { CLIENT_USER_AGENTS[clientAttempt] })
+        http.setDefaultRequestProperties(if (ch.referrer.isBlank()) emptyMap() else mapOf("Referer" to ch.referrer))
+
+        status = Status("Connecting…")
+        AppLog.i("player", "  loading as ${tryingFormat.label} with ${agentName(ch.userAgent.ifBlank { CLIENT_USER_AGENTS[clientAttempt] })}")
+        player.setMediaSource(buildSource(ch, tryingFormat))
+        player.prepare()
+        player.play()
+    }
+
+    private fun buildSource(ch: Channel, format: StreamFormat): MediaSource {
+        val uri = Uri.parse(ch.url)
+        val item = MediaItem.Builder()
+            .setUri(uri)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(ch.name).build())
+            .setMimeType(
+                when (format) {
+                    StreamFormat.Hls -> MimeTypes.APPLICATION_M3U8
+                    StreamFormat.Dash -> MimeTypes.APPLICATION_MPD
+                    else -> null
+                }
+            )
+            .build()
+        return when (uri.scheme?.lowercase()) {
+            "rtmp" -> ProgressiveMediaSource.Factory(RtmpDataSource.Factory()).createMediaSource(item)
+            "rtsp" -> RtspMediaSource.Factory().createMediaSource(item)
+            else ->
+                if (format == StreamFormat.Direct) ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this, http)).createMediaSource(item)
+                else mediaSources.createMediaSource(item)
+        }
+    }
+
+    private fun zap(delta: Int) {
+        if (queue.size < 2) return
+        play((index + delta + queue.size) % queue.size)
+        banner = "${index + 1} / ${queue.size}  ·  ${queue[index].displayName()}"
+        bannerHandler.removeCallbacks(hideBanner)
+        bannerHandler.postDelayed(hideBanner, 2500)
+    }
+
+    // Channel up/down keys, as on a Bluetooth remote or keyboard
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> { zap(1); true }
+        KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> { zap(-1); true }
+        else -> super.onKeyDown(keyCode, event)
+    }
+
+    // ---------- errors & reconnect ----------
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(state: Int) {
+            when (state) {
+                Player.STATE_READY -> {
+                    if (!reachedReady) {
+                        val v = player.videoFormat
+                        AppLog.i("player", "  playing: ${v?.width ?: 0}×${v?.height ?: 0} ${v?.sampleMimeType ?: "no video"}, live=${player.isCurrentMediaItemLive}")
+                    }
+                    status = null
+                    retries = 0
+                    reachedReady = true
+                }
+                Player.STATE_ENDED -> if (!player.isCurrentMediaItemLive) status = Status("Finished playing.")
+                else -> Unit
+            }
+            isLive = player.isCurrentMediaItemLive
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            runCatching { setPictureInPictureParams(pipParams()) }
+        }
+
+        override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+            hasQualities = tracks.groups.any { it.type == C.TRACK_TYPE_VIDEO && it.length > 1 }
+            val sizes = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+                .flatMap { g -> (0 until g.length).filter { g.isTrackSupported(it) }.map { g.getTrackFormat(it) } }
+                .filter { it.height > 0 }.map { "${it.width}×${it.height}" }.distinct()
+            if (sizes.isNotEmpty()) AppLog.i("player", "  video quality available: ${sizes.joinToString(", ")}")
+        }
+
+        override fun onPlayerError(error: PlaybackException) = handleError(error)
+    }
+
+    private fun handleError(e: PlaybackException) {
+        val code = e.errorCode
+        AppLog.e("player", "  ${e.errorCodeName}" + (httpErrorCode(e)?.let { " (HTTP $it)" } ?: ""), e.cause ?: e)
+
+        // Live stream moved past our position: jump back to the live edge
+        if (code == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+            player.seekToDefaultPosition()
+            player.prepare()
+            return
+        }
+
+        // The link has no telling extension: try it as HLS, then DASH
+        if (requestedFormat == StreamFormat.Auto && detectedFormat == StreamFormat.Auto && code in PARSING_ERRORS && tryingFormat != StreamFormat.Dash) {
+            tryingFormat = if (tryingFormat == StreamFormat.Hls) StreamFormat.Dash else StreamFormat.Hls
+            AppLog.i("player", "  not a direct file; trying as ${tryingFormat.label}")
+            load()
+            return
+        }
+
+        // The server refused this client: try again under another common player's name
+        val httpCode = httpErrorCode(e)
+        if (httpCode in REFUSED_CODES && queue[index].userAgent.isBlank() && clientAttempt < CLIENT_USER_AGENTS.lastIndex) {
+            clientAttempt++
+            AppLog.i("player", "  server refused the client; retrying as ${agentName(CLIENT_USER_AGENTS[clientAttempt])}")
+            load()
+            return
+        }
+
+        // A stream that was playing dropped: reconnect with backoff (1, 2, 4, 8, 16 s)
+        if (reachedReady && code in NETWORK_ERRORS && retries < MAX_RETRIES) {
+            retries++
+            AppLog.i("player", "  connection lost; reconnecting ($retries of $MAX_RETRIES)")
+            status = Status("Connection lost. Reconnecting ($retries of $MAX_RETRIES)…")
+            handler.postDelayed({
+                if (player.isCurrentMediaItemLive) player.seekToDefaultPosition()
+                player.prepare()
+            }, 1000L shl (retries - 1))
+            return
+        }
+
+        status = Status(explain(e), isError = true)
+    }
+
+    private fun explain(e: PlaybackException): String {
+        val httpCode = httpErrorCode(e)
+        val code = e.errorCode
+        return when {
+            httpCode != null -> httpProblem(httpCode).replaceFirstChar { it.uppercase() } + "."
+            code in NETWORK_ERRORS -> "Can't reach the server. Check the link and your internet connection."
+            code == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "That file doesn't exist."
+            code in PARSING_ERRORS ->
+                "This link doesn't look like a playable stream. If you know its format, pick HLS or DASH on the main screen and try again."
+            code in DECODER_ERRORS -> "This device can't decode the stream's video format."
+            code in 6000..6999 -> "This stream is DRM-protected and can't be played here."
+            else -> "Playback failed (${e.errorCodeName})."
+        }
+    }
+
+    private fun httpErrorCode(e: PlaybackException): Int? =
+        generateSequence(e.cause) { it.cause }
+            .filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()?.responseCode
+
+    // ---------- stats ----------
+
+    private fun updateStats() {
+        if (current == null) return
+        val f = player.videoFormat
+        val size = player.videoSize
+        val scheme = Uri.parse(current!!.url).scheme?.lowercase()
+        val fmt = when {
+            scheme == "rtsp" -> "RTSP"
+            scheme == "rtmp" -> "RTMP"
+            player.currentManifest is HlsManifest -> "HLS"
+            player.currentManifest is DashManifest -> "DASH"
+            player.playbackState == Player.STATE_IDLE -> "–"
+            else -> "Direct"
+        }
+        val liveOffset = player.currentLiveOffset
+        stats = Stats(
+            format = fmt,
+            resolution = if (size.width > 0) "${size.width}×${size.height}" else "–",
+            codec = f?.codecs ?: f?.sampleMimeType?.substringAfter('/') ?: "–",
+            bitrate = f?.bitrate?.takeIf { it > 0 }?.let(::formatBitrate) ?: "–",
+            buffer = "%.1f s".format(player.totalBufferedDuration / 1000.0),
+            dropped = droppedFrames.toString(),
+            latency = if (player.isCurrentMediaItemLive && liveOffset != C.TIME_UNSET) "%.1f s".format(liveOffset / 1000.0) else "–",
+        )
+        isLive = player.isCurrentMediaItemLive
+    }
+
+    // ---------- window ----------
+
+    private fun goFullscreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    private fun pipParams(): PictureInPictureParams {
+        val s = player.videoSize
+        val ratio = if (s.width > 0 && s.height > 0) s.width.toFloat() / s.height else 16f / 9
+        // Android rejects aspect ratios outside 1:2.39 – 2.39:1
+        val clamped = ratio.coerceIn(1 / 2.39f, 2.39f)
+        return PictureInPictureParams.Builder()
+            .setAspectRatio(Rational((clamped * 1000).toInt(), 1000))
+            .apply { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setAutoEnterEnabled(true) }
+            .build()
+    }
+
+    private fun enterPip() {
+        runCatching { enterPictureInPictureMode(pipParams()) }
+    }
+
+    private fun showQualityPicker() {
+        TrackSelectionDialogBuilder(this, "Video quality", player, C.TRACK_TYPE_VIDEO)
+            .setShowDisableOption(false)
+            .setAllowAdaptiveSelections(true)
+            .build()
+            .show()
+    }
+
+    // ---------- UI ----------
+
+    @Composable
+    private fun PlayerScreen() {
+        val channels by store.channels.collectAsState()
+        val favorite = channels.any { it.url == current?.url && it.favorite }
+
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = this@PlayerActivity.player
+                        keepScreenOn = true
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                        setShowSubtitleButton(true)
+                        setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
+                            controlsVisible = v == View.VISIBLE
+                        })
+                    }
+                },
+                update = { it.useController = !inPip },
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            if (inPip) return@Box
+
+            AnimatedVisibility(
+                visible = controlsVisible || status?.isError == true,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter),
+            ) {
+                TopBar(favorite)
+            }
+
+            if (queue.size > 1) {
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
+                        .padding(end = 12.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        ChannelButton("+", "Next channel") { zap(1) }
+                        ChannelButton("−", "Previous channel") { zap(-1) }
+                    }
+                }
+            }
+
+            banner?.let { text ->
+                Text(
+                    text,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
+                        .padding(top = 96.dp, start = 16.dp, end = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
+
+            status?.let { s ->
+                StatusCard(s, Modifier.align(Alignment.Center))
+            }
+
+            if (showStats) {
+                StatsPanel(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Top))
+                        .padding(top = 72.dp, end = 12.dp)
+                )
+            }
+        }
+    }
+
+    /** A big round channel up/down button, easy to hit while watching. */
+    @Composable
+    private fun ChannelButton(sign: String, description: String, onClick: () -> Unit) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.6f),
+            contentColor = Color.White,
+            modifier = Modifier.size(68.dp).semantics { contentDescription = description },
+        ) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("CH", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                Text(sign, fontSize = 28.sp, fontWeight = FontWeight.Bold, lineHeight = 28.sp)
+            }
+        }
+    }
+
+    @Composable
+    private fun TopBar(favorite: Boolean) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)))
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top))
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = ::finish) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    current?.displayName().orEmpty(),
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (isLive) {
+                        Text(
+                            "LIVE",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.background(OnAir, RoundedCornerShape(3.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+                    if (queue.size > 1) {
+                        Text(
+                            "${index + 1} / ${queue.size}",
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
+            }
+            if (queue.size > 1) {
+                IconButton(onClick = { zap(-1) }) { Icon(Icons.Default.SkipPrevious, "Previous channel", tint = Color.White) }
+                IconButton(onClick = { zap(1) }) { Icon(Icons.Default.SkipNext, "Next channel", tint = Color.White) }
+            }
+            IconButton(onClick = { current?.let(store::toggleFavorite) }) {
+                if (favorite) Icon(Icons.Default.Star, "Remove from favorites", tint = Amber)
+                else Icon(Icons.Outlined.StarBorder, "Add to favorites", tint = Color.White)
+            }
+            if (hasQualities) {
+                IconButton(onClick = ::showQualityPicker) { Icon(Icons.Default.HighQuality, "Video quality", tint = Color.White) }
+            }
+            IconButton(onClick = { showStats = !showStats }) {
+                Icon(Icons.Outlined.QueryStats, "Stream info", tint = if (showStats) Amber else Color.White)
+            }
+            IconButton(onClick = ::enterPip) { Icon(Icons.Default.PictureInPictureAlt, "Picture-in-picture", tint = Color.White) }
+        }
+    }
+
+    @Composable
+    private fun StatusCard(s: Status, modifier: Modifier) {
+        if (!s.isError) {
+            Text(
+                s.text,
+                color = Color.White,
+                modifier = modifier.padding(top = 96.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+            return
+        }
+        Surface(
+            modifier = modifier.padding(24.dp).widthIn(max = 420.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Can't play this stream", style = MaterialTheme.typography.titleMedium, color = OnAir)
+                Text(s.text, style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { play(index) }) { Text("Try again") }
+                    if (queue.size > 1) OutlinedButton(onClick = { zap(1) }) { Text("Next channel") }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun StatsPanel(modifier: Modifier) {
+        val rows = listOf(
+            "Format" to stats.format,
+            "Resolution" to stats.resolution,
+            "Codec" to stats.codec,
+            "Bitrate" to stats.bitrate,
+            "Buffer" to stats.buffer,
+            "Dropped frames" to stats.dropped,
+            "Behind live" to stats.latency,
+        )
+        Column(
+            modifier.background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp)).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            rows.forEach { (label, value) ->
+                Row {
+                    Text(label, color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, modifier = Modifier.widthIn(min = 104.dp))
+                    Spacer(Modifier.padding(start = 8.dp))
+                    Text(value, color = Color.White, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
+    }
+
+    companion object {
+        private const val EXTRA_QUEUE = "queue"
+        private const val EXTRA_INDEX = "index"
+        private const val EXTRA_FORMAT = "format"
+        private const val MAX_RETRIES = 5
+
+        private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)
+        private val UNSUPPORTED_SCHEMES = setOf("udp", "rtp", "srt", "mms", "rtmps")
+
+        private val NETWORK_ERRORS = setOf(
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        )
+        private val PARSING_ERRORS = setOf(
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        )
+        private val DECODER_ERRORS = setOf(
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+        )
+
+        fun formatBitrate(bps: Int): String =
+            if (bps >= 1_000_000) "%.1f Mbps".format(bps / 1e6) else "${bps / 1000} kbps"
+
+        fun intent(context: Context, queue: List<Channel>, index: Int, format: StreamFormat): Intent =
+            Intent(context, PlayerActivity::class.java)
+                .putStringArrayListExtra(EXTRA_QUEUE, ArrayList(queue.map { it.toJson().toString() }))
+                .putExtra(EXTRA_INDEX, index)
+                .putExtra(EXTRA_FORMAT, format.ordinal)
+    }
+}
