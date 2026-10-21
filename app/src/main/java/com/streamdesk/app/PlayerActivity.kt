@@ -1,7 +1,9 @@
 package com.streamdesk.app
 
 import android.app.PictureInPictureParams
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.IntentFilter
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -69,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -174,11 +177,21 @@ class PlayerActivity : ComponentActivity() {
             .build()
         player.addListener(playerListener)
         player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                AppLog.i("player", "  video decoder: $decoderName")
+            }
+
+            override fun onVideoCodecError(eventTime: AnalyticsListener.EventTime, videoCodecError: Exception) {
+                AppLog.e("player", "  video decoder problem", videoCodecError)
+            }
+
             override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
                 this@PlayerActivity.droppedFrames += droppedFrames
             }
         })
 
+        // Record when the phone turns its screen off, so a black screen can be told apart from a stopped video
+        ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
         goFullscreen()
         addOnPictureInPictureModeChangedListener { inPip = it.isInPictureInPictureMode }
         setContent { StreamDeskTheme { PlayerScreen() } }
@@ -189,8 +202,13 @@ class PlayerActivity : ComponentActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var seconds = 0
                 while (true) {
                     updateStats()
+                    // A line every 30 s: if the picture goes black, the log shows whether playback was still running
+                    if (++seconds % 30 == 0) {
+                        AppLog.i("player", "  alive ${seconds}s: ${stateName(player.playbackState)}, playing=${player.isPlaying}, buffer ${stats.buffer}, dropped ${stats.dropped}")
+                    }
                     delay(1000)
                 }
             }
@@ -203,16 +221,44 @@ class PlayerActivity : ComponentActivity() {
         loadFromIntent(intent)
     }
 
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            AppLog.i("player", "  phone screen turned OFF (screen timeout, power button or lock)")
+        }
+    }
+
+    private fun stateName(state: Int) = when (state) {
+        Player.STATE_IDLE -> "idle"
+        Player.STATE_BUFFERING -> "buffering"
+        Player.STATE_READY -> "ready"
+        Player.STATE_ENDED -> "ended"
+        else -> "state $state"
+    }
+
+    override fun onResume() {
+        super.onResume()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        AppLog.i("player", "  screen-on flag set: ${window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0}")
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) AppLog.i("player", "  window lost focus (a popup, notification shade or another app is on top)")
+    }
+
     override fun onStart() {
         super.onStart()
+        if (pausedByStop) AppLog.i("player", "  app is back on screen; resuming")
         if (pausedByStop) player.play()
         pausedByStop = false
     }
 
     override fun onStop() {
         super.onStop()
+        AppLog.i("player", "  app left the screen (playing=${player.isPlaying}, picture-in-picture=$isInPictureInPictureMode)")
         // Keep playing in picture-in-picture; pause when the app really goes to the background
         if (!isInPictureInPictureMode && player.isPlaying) {
+            AppLog.i("player", "  pausing because the app is in the background")
             player.pause()
             pausedByStop = true
         }
@@ -221,6 +267,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         bannerHandler.removeCallbacksAndMessages(null)
+        runCatching { unregisterReceiver(screenReceiver) }
         if (::player.isInitialized) player.release()
         super.onDestroy()
     }
@@ -336,7 +383,19 @@ class PlayerActivity : ComponentActivity() {
     // ---------- errors & reconnect ----------
 
     private val playerListener = object : Player.Listener {
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            val why = when (reason) {
+                Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST -> "you"
+                Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS -> "another app took the audio"
+                Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> "headphones or Bluetooth disconnected"
+                Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE -> "a remote control"
+                else -> "reason $reason"
+            }
+            AppLog.i("player", "  ${if (playWhenReady) "play" else "pause"} requested by $why")
+        }
+
         override fun onPlaybackStateChanged(state: Int) {
+            AppLog.i("player", "  ${stateName(state)} at ${player.currentPosition / 1000}s")
             when (state) {
                 Player.STATE_READY -> {
                     if (!reachedReady) {
