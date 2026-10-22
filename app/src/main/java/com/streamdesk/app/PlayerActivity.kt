@@ -23,6 +23,7 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.material.icons.filled.Cast
@@ -806,11 +807,15 @@ class PlayerActivity : ComponentActivity() {
             )
             LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                 itemsIndexed(queue) { i, ch ->
+                    var focused by remember { mutableStateOf(false) }
+                    val now = i == index
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 2.dp)
-                            .then(if (i == index) Modifier.focusRequester(focus) else Modifier)
+                            .then(if (now) Modifier.focusRequester(focus) else Modifier)
+                            .onFocusChanged { focused = it.isFocused }
+                            .background(if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
                             .clickable {
                                 listOpen = false
                                 if (i != index) play(i)
@@ -823,17 +828,25 @@ class PlayerActivity : ComponentActivity() {
                         Text(
                             if (i == index) "▶" else "%02d".format(i + 1),
                             fontFamily = FontFamily.Monospace,
-                            color = if (i == index) Amber else Color.White.copy(alpha = 0.75f),
+                            color = when {
+                                focused -> if (now) FocusAmberDark else FocusInkSoft
+                                now -> Amber
+                                else -> Color.White.copy(alpha = 0.75f)
+                            },
                         )
                         Column(Modifier.weight(1f)) {
                             Text(
                                 ch.displayName(),
-                                color = if (i == index) Amber else Color.White,
-                                fontWeight = if (i == index) FontWeight.Bold else FontWeight.Normal,
+                                color = when {
+                                    focused -> if (now) FocusAmberDark else FocusInk
+                                    now -> Amber
+                                    else -> Color.White
+                                },
+                                fontWeight = if (now || focused) FontWeight.Bold else FontWeight.Normal,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (ch.group.isNotBlank()) Text(ch.group, color = Color.White.copy(alpha = 0.78f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                            if (ch.group.isNotBlank()) Text(ch.group, color = if (focused) FocusInkSoft else Color.White.copy(alpha = 0.78f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                         }
                     }
                 }

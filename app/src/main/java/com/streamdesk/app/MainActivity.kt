@@ -8,6 +8,7 @@ import android.widget.Toast
 import kotlinx.coroutines.delay
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -72,7 +73,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
@@ -403,16 +403,16 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
                         }
                         DropdownMenu(importMenu, onDismissRequest = { importMenu = false }) {
-                            DropdownMenuItem(text = { Text("Sign in with username & password") }, onClick = {
+                            AppMenuItem(text = { Text("Sign in with username & password") }, onClick = {
                                 importMenu = false; dialog = HomeDialog.EditLogin(null, null)
                             })
-                            DropdownMenuItem(text = { Text("Add playlist link") }, onClick = {
+                            AppMenuItem(text = { Text("Add playlist link") }, onClick = {
                                 importMenu = false; dialog = HomeDialog.AddPlaylist
                             })
-                            DropdownMenuItem(text = { Text("Import .m3u file") }, onClick = {
+                            AppMenuItem(text = { Text("Import .m3u file") }, onClick = {
                                 importMenu = false; openFile.launch(arrayOf("*/*"))
                             })
-                            DropdownMenuItem(text = { Text("Paste playlist text") }, onClick = {
+                            AppMenuItem(text = { Text("Paste playlist text") }, onClick = {
                                 importMenu = false; dialog = HomeDialog.PasteText
                             })
                         }
@@ -423,37 +423,37 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                         }
                         DropdownMenu(moreMenu, onDismissRequest = { moreMenu = false }) {
                             if (sources.isNotEmpty()) {
-                                DropdownMenuItem(text = { Text("Update all playlists") }, onClick = {
+                                AppMenuItem(text = { Text("Update all playlists") }, onClick = {
                                     moreMenu = false; sources.forEach { loadPlaylist(it.url) }
                                 })
                             }
-                            DropdownMenuItem(text = { Text("Export as .m3u file") }, onClick = {
+                            AppMenuItem(text = { Text("Export as .m3u file") }, onClick = {
                                 moreMenu = false; saveFile.launch("stream-desk.m3u")
                             })
-                            DropdownMenuItem(text = { Text("Share channel list") }, onClick = {
+                            AppMenuItem(text = { Text("Share channel list") }, onClick = {
                                 moreMenu = false
                                 val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, M3u.export(channels))
                                 context.startActivity(Intent.createChooser(send, "Share channel list"))
                             })
                             if (sources.isNotEmpty()) {
-                                DropdownMenuItem(
+                                AppMenuItem(
                                     text = { Text(if (linkBarOpen) "Hide the link bar" else "Open a link") },
                                     onClick = { moreMenu = false; linkBarOpen = !linkBarOpen },
                                 )
                             }
-                            DropdownMenuItem(text = { Text("Clear recent") }, onClick = {
+                            AppMenuItem(text = { Text("Clear recent") }, onClick = {
                                 moreMenu = false; store.clearRecent()
                             })
                             if (LocalIsTv.current) {
-                                DropdownMenuItem(text = { Text("Link a phone") }, onClick = {
+                                AppMenuItem(text = { Text("Link a phone") }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.LinkPhone
                                 })
                             }
-                            DropdownMenuItem(text = { Text("Edit Sport list") }, onClick = {
+                            AppMenuItem(text = { Text("Edit Sport list") }, onClick = {
                                 moreMenu = false; dialog = HomeDialog.EditSport
                             })
                             HorizontalDivider()
-                            DropdownMenuItem(text = { Text("Logs") }, onClick = {
+                            AppMenuItem(text = { Text("Logs") }, onClick = {
                                 moreMenu = false; dialog = HomeDialog.Logs
                             })
                         }
@@ -803,15 +803,15 @@ private fun PlaylistsPane(
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Playlist options") }
                             DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                                DropdownMenuItem(text = { Text("Show channels") }, onClick = { menu = false; onShow(s) })
-                                DropdownMenuItem(text = { Text(if (s.xtream != null) "Edit login" else "Rename") }, onClick = { menu = false; onRename(s) })
-                                DropdownMenuItem(text = { Text(if (s.enabled) "Turn off" else "Turn on") }, onClick = { menu = false; onToggle(s) })
+                                AppMenuItem(text = { Text("Show channels") }, onClick = { menu = false; onShow(s) })
+                                AppMenuItem(text = { Text(if (s.xtream != null) "Edit login" else "Rename") }, onClick = { menu = false; onRename(s) })
+                                AppMenuItem(text = { Text(if (s.enabled) "Turn off" else "Turn on") }, onClick = { menu = false; onToggle(s) })
                                 if (onSendLogin != null && s.xtream != null) {
-                                    DropdownMenuItem(text = { Text("Send login to TV") }, onClick = { menu = false; onSendLogin(s) })
+                                    AppMenuItem(text = { Text("Send login to TV") }, onClick = { menu = false; onSendLogin(s) })
                                 }
-                                DropdownMenuItem(text = { Text("Show logs") }, onClick = { menu = false; onLogs() })
-                                DropdownMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy(s) })
-                                DropdownMenuItem(text = { Text("Remove playlist") }, onClick = { menu = false; onRemove(s) })
+                                AppMenuItem(text = { Text("Show logs") }, onClick = { menu = false; onLogs() })
+                                AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy(s) })
+                                AppMenuItem(text = { Text("Remove playlist") }, onClick = { menu = false; onRemove(s) })
                             }
                         }
                     }
@@ -881,7 +881,7 @@ private fun FormatPicker(format: StreamFormat, onPick: (StreamFormat) -> Unit, m
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
             StreamFormat.entries.forEach { f ->
-                DropdownMenuItem(text = { Text(f.label) }, onClick = { onPick(f); open = false })
+                AppMenuItem(text = { Text(f.label) }, onClick = { onPick(f); open = false })
             }
         }
     }
@@ -903,9 +903,16 @@ private fun ChannelRow(
     removeLabel: String,
 ) {
     var menu by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    val lit = LocalIsTv.current && focused   // on a TV, the row the remote is on turns solid white
     ListItem(
-        modifier = modifier.clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        modifier = modifier.onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(
+            containerColor = if (lit) Color.White else MaterialTheme.colorScheme.background,
+            headlineColor = if (lit) FocusInk else MaterialTheme.colorScheme.onSurface,
+            supportingColor = if (lit) FocusInkSoft else MaterialTheme.colorScheme.onSurfaceVariant,
+            trailingIconColor = if (lit) FocusInkSoft else MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
         leadingContent = { ChannelBadge(channel, number) },
         headlineContent = { Text(channel.displayName(), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
@@ -924,17 +931,17 @@ private fun ChannelRow(
         trailingContent = {
             Row {
                 IconButton(onClick = onToggleFavorite) {
-                    if (channel.favorite) Icon(Icons.Default.Star, contentDescription = "Remove from favorites", tint = Amber)
+                    if (channel.favorite) Icon(Icons.Default.Star, contentDescription = "Remove from favorites", tint = if (lit) FocusAmberDark else Amber)
                     else Icon(Icons.Outlined.StarBorder, contentDescription = "Add to favorites")
                 }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Channel options") }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                        if (saved) DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
-                        else DropdownMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })
-                        if (onPlayOnTv != null) DropdownMenuItem(text = { Text("Play on TV") }, onClick = { menu = false; onPlayOnTv() })
-                        DropdownMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy() })
-                        DropdownMenuItem(text = { Text(removeLabel) }, onClick = { menu = false; onRemove() })
+                        if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
+                        else AppMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })
+                        if (onPlayOnTv != null) AppMenuItem(text = { Text("Play on TV") }, onClick = { menu = false; onPlayOnTv() })
+                        AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy() })
+                        AppMenuItem(text = { Text(removeLabel) }, onClick = { menu = false; onRemove() })
                     }
                 }
             }
@@ -1160,7 +1167,7 @@ private fun LoginEditor(
                         }
                         DropdownMenu(updateMenu, onDismissRequest = { updateMenu = false }) {
                             UPDATE_CHOICES.forEach { (hours, label) ->
-                                DropdownMenuItem(text = { Text(label) }, onClick = { updateHours = hours; updateMenu = false })
+                                AppMenuItem(text = { Text(label) }, onClick = { updateHours = hours; updateMenu = false })
                             }
                         }
                     }

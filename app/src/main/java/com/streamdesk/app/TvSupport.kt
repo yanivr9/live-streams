@@ -9,7 +9,24 @@ import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -45,6 +62,34 @@ object TvKeys {
     }
 }
 
+/** The selected row on a TV is solid white, so its text and icons turn near-black. */
+val FocusInk = Color(0xFF0E1113)
+val FocusInkSoft = Color(0xFF3A444A)
+val FocusAmberDark = Color(0xFFA65F00)   // the amber of the favorite star and "now playing", dark enough on white
+
+/** Menu entry: on a TV it turns solid white when the remote is on it; on a phone it's the usual menu item. */
+@Composable
+fun AppMenuItem(text: @Composable () -> Unit, onClick: () -> Unit) {
+    if (!LocalIsTv.current) {
+        DropdownMenuItem(text = text, onClick = onClick)
+        return
+    }
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .background(if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+    ) {
+        CompositionLocalProvider(LocalContentColor provides if (focused) FocusInk else MaterialTheme.colorScheme.onSurface) {
+            ProvideTextStyle(MaterialTheme.typography.bodyLarge, text)
+        }
+    }
+}
+
 /** On a TV the remote moves a highlight around the screen: an amber frame on whatever is selected. */
 object TvFocusIndication : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode = FocusNode(interactionSource)
@@ -73,19 +118,13 @@ object TvFocusIndication : IndicationNodeFactory {
 
         override fun ContentDrawScope.draw() {
             val corner = CornerRadius(8.dp.toPx())
-            if (focused) drawRoundRect(Amber.copy(alpha = 0.30f), cornerRadius = corner)
             drawContent()
             if (focused) {
-                // A white ring with an amber ring inside it: easy to see on any TV, whatever its contrast settings
-                val outer = 4.dp.toPx()
-                val inner = 2.dp.toPx()
+                // A thick white ring: visible on buttons, tabs and icons (channel rows and menus also fill with white)
+                val ring = 4.dp.toPx()
                 drawRoundRect(
-                    Color.White, topLeft = Offset(outer / 2, outer / 2), size = Size(size.width - outer, size.height - outer),
-                    cornerRadius = corner, style = Stroke(width = outer),
-                )
-                drawRoundRect(
-                    Amber, topLeft = Offset(outer + inner / 2, outer + inner / 2), size = Size(size.width - 2 * outer - inner, size.height - 2 * outer - inner),
-                    cornerRadius = CornerRadius(4.dp.toPx()), style = Stroke(width = inner),
+                    Color.White, topLeft = Offset(ring / 2, ring / 2), size = Size(size.width - ring, size.height - ring),
+                    cornerRadius = corner, style = Stroke(width = ring),
                 )
             } else if (pressed) {
                 drawRoundRect(Color.White.copy(alpha = 0.10f), cornerRadius = corner)
