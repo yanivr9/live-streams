@@ -170,6 +170,8 @@ private sealed interface HomeDialog {
     data class Crash(val report: String) : HomeDialog
     data object Logs : HomeDialog
     data object EditSport : HomeDialog
+    data object LinkPhone : HomeDialog
+    data class PickTv(val job: TvJob) : HomeDialog
 }
 
 /** Live TV / Movies / Series filter; Episode items only appear in Recent. */
@@ -275,6 +277,26 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                 }
             }.isSuccess
             notify(if (ok) "Saved ${channels.size} channels." else "Couldn't save the file.")
+        }
+    }
+
+    fun runTvJob(job: TvJob, device: TvDevice, code: String) {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    when (job) {
+                        is TvJob.Play -> LinkClient.play(device, code, job.queue, job.index)
+                        is TvJob.Login -> LinkClient.sendLogin(
+                            device, code,
+                            LoginRequest(job.source.xtream!!, job.source.name, job.source.enabled, job.source.updateHours, sportSettings),
+                        )
+                    }
+                }
+            }
+            result.onSuccess {
+                LinkPrefs.save(context, device.host, code)
+                notify(if (job is TvJob.Login) "Login sent to ${device.name}." else "Playing on ${device.name}.")
+            }.onFailure { notify(it.message ?: "Couldn't reach the TV.") }
         }
     }
 
@@ -422,6 +444,11 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                             DropdownMenuItem(text = { Text("Clear recent") }, onClick = {
                                 moreMenu = false; store.clearRecent()
                             })
+                            if (LocalIsTv.current) {
+                                DropdownMenuItem(text = { Text("Link a phone") }, onClick = {
+                                    moreMenu = false; dialog = HomeDialog.LinkPhone
+                                })
+                            }
                             DropdownMenuItem(text = { Text("Edit Sport list") }, onClick = {
                                 moreMenu = false; dialog = HomeDialog.EditSport
                             })
@@ -492,6 +519,7 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                     },
                     onToggle = { store.setEnabled(it.url, !it.enabled) },
                     onLogs = { dialog = HomeDialog.Logs },
+                    onSendLogin = if (isTv) null else { source -> dialog = HomeDialog.PickTv(TvJob.Login(source)) },
                     onCopy = { clipboard.setText(AnnotatedString(it.url)); notify("Link copied.") },
                     onRemove = { dialog = HomeDialog.RemovePlaylist(it) },
                     modifier = Modifier.weight(1f),
@@ -565,6 +593,13 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                             onRename = { dialog = HomeDialog.Rename(ch) },
                             onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
                             onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
+                            onPlayOnTv = if (isTv) null else {
+                                {
+                                    val from = (i - 100).coerceAtLeast(0)
+                                    val to = (i + 100).coerceAtMost(visible.size)
+                                    dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
+                                }
+                            },
                             onRemove = {
                                 if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url)
                             },
@@ -647,6 +682,12 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
             },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
         )
+        HomeDialog.LinkPhone -> LinkPhoneDialog(onDismiss = { dialog = null })
+        is HomeDialog.PickTv -> TvPickerDialog(
+            title = if (d.job is TvJob.Login) "Send login to TV" else "Play on TV",
+            onDismiss = { dialog = null },
+            onChosen = { device, code -> dialog = null; runTvJob(d.job, device, code) },
+        )
         HomeDialog.EditSport -> SportListEditor(
             initial = sportSettings,
             onDismiss = { dialog = null },
@@ -689,6 +730,7 @@ private fun PlaylistsPane(
     onRename: (PlaylistSource) -> Unit,
     onToggle: (PlaylistSource) -> Unit,
     onLogs: () -> Unit,
+    onSendLogin: ((PlaylistSource) -> Unit)?,
     onCopy: (PlaylistSource) -> Unit,
     onRemove: (PlaylistSource) -> Unit,
     modifier: Modifier = Modifier,
@@ -764,6 +806,9 @@ private fun PlaylistsPane(
                                 DropdownMenuItem(text = { Text("Show channels") }, onClick = { menu = false; onShow(s) })
                                 DropdownMenuItem(text = { Text(if (s.xtream != null) "Edit login" else "Rename") }, onClick = { menu = false; onRename(s) })
                                 DropdownMenuItem(text = { Text(if (s.enabled) "Turn off" else "Turn on") }, onClick = { menu = false; onToggle(s) })
+                                if (onSendLogin != null && s.xtream != null) {
+                                    DropdownMenuItem(text = { Text("Send login to TV") }, onClick = { menu = false; onSendLogin(s) })
+                                }
                                 DropdownMenuItem(text = { Text("Show logs") }, onClick = { menu = false; onLogs() })
                                 DropdownMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy(s) })
                                 DropdownMenuItem(text = { Text("Remove playlist") }, onClick = { menu = false; onRemove(s) })
@@ -853,6 +898,7 @@ private fun ChannelRow(
     onRename: () -> Unit,
     onSave: () -> Unit,
     onCopy: () -> Unit,
+    onPlayOnTv: (() -> Unit)?,
     onRemove: () -> Unit,
     removeLabel: String,
 ) {
@@ -886,6 +932,7 @@ private fun ChannelRow(
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         if (saved) DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
                         else DropdownMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })
+                        if (onPlayOnTv != null) DropdownMenuItem(text = { Text("Play on TV") }, onClick = { menu = false; onPlayOnTv() })
                         DropdownMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy() })
                         DropdownMenuItem(text = { Text(removeLabel) }, onClick = { menu = false; onRemove() })
                     }

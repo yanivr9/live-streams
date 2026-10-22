@@ -20,6 +20,9 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 - **TV mode** (Android TV / Google TV boxes such as the Xiaomi Mi Box): appears on the TV home screen, larger UI, a
   highlight that follows the remote, ▲/▼ to change channel, OK for the channel list, Menu for quality or stream info.
   Switches on automatically on a TV; phones are unchanged.
+- **Play on TV**: from the phone, send a channel (and its list) to Stream Desk on a TV box over the home Wi-Fi, then use the
+  phone as a remote (CH +/−, stop). Also sends the IPTV login and Sport list to the TV, so nothing is typed with the remote.
+  The TV announces itself on the network and shows a 6-digit pairing code (⋮ → Link a phone); wrong codes are locked out.
 - **Auto-reconnect**: a live stream that drops reconnects up to 5 times (after 1, 2, 4, 8 and 16 s).
 - Opens stream links shared from other apps or tapped in a browser, and `.m3u` files from a file manager.
 
@@ -62,4 +65,7 @@ For the Play Store you need a release build signed with your own key (`./gradlew
 | `Xtream.kt` | IPTV sign-in: live channels, movies, series, episodes |
 | `Theme.kt` | Colors, TV scaling |
 | `TvSupport.kt` | TV detection, remote key mapping, focus highlight |
+| `Link.kt` | Play on TV: the TV's small server and the phone's client |
+| `LinkAndroid.kt` | Finding the TV (NSD), pairing code, handling what the phone sends |
+| `LinkUi.kt` | TV picker and "Link a phone" screens |
 | `SportList.kt` | The Sport tab: chosen channels, best quality, logos |

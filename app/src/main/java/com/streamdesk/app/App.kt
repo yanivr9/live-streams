@@ -10,6 +10,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         AppLog.init(filesDir)
+        if (isTelevision()) LinkReceiver.start(this)
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull()
         AppLog.i("app", "Started Stream Desk $version on Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})")
         val previous = Thread.getDefaultUncaughtExceptionHandler()

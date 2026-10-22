@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Rational
 import android.view.View
+import android.widget.Toast
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -22,6 +23,9 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.remember
@@ -158,6 +162,11 @@ class PlayerActivity : ComponentActivity() {
     private var showStats by mutableStateOf(false)
     private val isTv by lazy { isTelevision() }
     private var listOpen by mutableStateOf(false)   // TV: the channel list opened with OK
+
+    // Phone: the TV this phone is currently controlling ("Play on TV"), and the code it was paired with
+    private var castTarget by mutableStateOf<TvDevice?>(null)
+    private var castCode = ""
+    private var showTvPicker by mutableStateOf(false)
     private var banner by mutableStateOf<String?>(null)   // "12 · channel name", shown briefly after switching channel
     private val bannerHandler = Handler(Looper.getMainLooper())
     private val hideBanner = Runnable { banner = null }
@@ -203,6 +212,18 @@ class PlayerActivity : ComponentActivity() {
                 this@PlayerActivity.droppedFrames += droppedFrames
             }
         })
+
+        if (isTv) {   // commands from a phone paired with this TV
+            lifecycleScope.launch {
+                LinkBus.commands.collect { action ->
+                    when (action) {
+                        "next" -> zap(1)
+                        "prev" -> zap(-1)
+                        "stop" -> finish()
+                    }
+                }
+            }
+        }
 
         // Record when the phone turns its screen off, so a black screen can be told apart from a stopped video
         ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -382,8 +403,35 @@ class PlayerActivity : ComponentActivity() {
 
     private fun zap(delta: Int) {
         if (queue.size < 2) return
+        val tv = castTarget
+        if (tv != null) {
+            // The TV changes channel; this phone only follows along so "Play here" starts on the same one
+            index = (index + delta + queue.size) % queue.size
+            current = queue[index]
+            sendToTv(tv, if (delta > 0) "next" else "prev")
+            return
+        }
         play((index + delta + queue.size) % queue.size)
         showBanner()
+    }
+
+    private fun sendToTv(tv: TvDevice, action: String) {
+        lifecycleScope.launch {
+            runCatching { withContext(Dispatchers.IO) { LinkClient.command(tv, castCode, action) } }
+                .onFailure { Toast.makeText(this@PlayerActivity, it.message ?: "Couldn't reach the TV.", Toast.LENGTH_LONG).show() }
+        }
+    }
+
+    private fun playOnTv(tv: TvDevice, code: String) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { LinkClient.play(tv, code, queue, index) } }
+            result.onSuccess {
+                LinkPrefs.save(this@PlayerActivity, tv.host, code)
+                castTarget = tv
+                castCode = code
+                player.pause()
+            }.onFailure { Toast.makeText(this@PlayerActivity, it.message ?: "Couldn't reach the TV.", Toast.LENGTH_LONG).show() }
+        }
     }
 
     private fun showBanner() {
@@ -674,6 +722,18 @@ class PlayerActivity : ComponentActivity() {
                 ChannelPicker(Modifier.align(Alignment.CenterStart))
             }
 
+            castTarget?.let { tv ->
+                CastPanel(tv, Modifier.fillMaxSize())
+            }
+
+            if (showTvPicker) {
+                TvPickerDialog(
+                    title = "Play on TV",
+                    onDismiss = { showTvPicker = false },
+                    onChosen = { tv, code -> showTvPicker = false; playOnTv(tv, code) },
+                )
+            }
+
             if (showStats) {
                 StatsPanel(
                     Modifier
@@ -682,6 +742,49 @@ class PlayerActivity : ComponentActivity() {
                         .padding(top = 72.dp, end = 12.dp)
                 )
             }
+        }
+    }
+
+    /** Phone: while a TV plays, this screen is its remote control. */
+    @Composable
+    private fun CastPanel(tv: TvDevice, modifier: Modifier) {
+        Column(
+            modifier.background(Color.Black.copy(alpha = 0.92f)).padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(Icons.Default.Cast, contentDescription = null, tint = Amber, modifier = Modifier.size(48.dp))
+            Text("Playing on ${tv.name}", color = Color.White, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
+            Text(
+                current?.displayName().orEmpty(),
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
+            )
+            if (queue.size > 1) {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    ChannelButton("−", "Previous channel on the TV") { zap(-1) }
+                    ChannelButton("+", "Next channel on the TV") { zap(1) }
+                }
+            }
+            Row(Modifier.padding(top = 28.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = {
+                    sendToTv(tv, "stop")
+                    castTarget = null
+                }) { Text("Stop the TV") }
+                Button(onClick = {
+                    sendToTv(tv, "stop")
+                    castTarget = null
+                    play(index)
+                }) { Text("Play here") }
+            }
+            Text(
+                "Back leaves the TV playing.",
+                color = Color.White.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 16.dp),
+            )
         }
     }
 
@@ -810,6 +913,7 @@ class PlayerActivity : ComponentActivity() {
             IconButton(onClick = { showStats = !showStats }) {
                 Icon(Icons.Outlined.QueryStats, "Stream info", tint = if (showStats) Amber else Color.White)
             }
+            IconButton(onClick = { showTvPicker = true }) { Icon(Icons.Default.Cast, "Play on TV", tint = Color.White) }
             IconButton(onClick = ::enterPip) { Icon(Icons.Default.PictureInPictureAlt, "Picture-in-picture", tint = Color.White) }
         }
     }
