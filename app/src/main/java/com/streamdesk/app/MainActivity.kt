@@ -166,6 +166,7 @@ private sealed interface HomeDialog {
     data class Series(val series: Channel) : HomeDialog
     data class Crash(val report: String) : HomeDialog
     data object Logs : HomeDialog
+    data object EditSport : HomeDialog
 }
 
 /** Live TV / Movies / Series filter; Episode items only appear in Recent. */
@@ -191,6 +192,8 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
     val channels by store.channels.collectAsState()
     val recent by store.recent.collectAsState()
     val sources by store.sources.collectAsState()
+    val sportStore = remember { SportSettingsStore.get(context) }
+    val sportSettings by sportStore.settings.collectAsState()
 
     var url by rememberSaveable { mutableStateOf("") }
     var format by rememberSaveable { mutableStateOf(StreamFormat.Auto) }
@@ -323,14 +326,18 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
         channels.filter {
             it.source !in turnedOff &&
             (section != Section.All || sourceFilter == null || it.source == sourceFilter) &&
-                (section != Section.Sport || it.isSport()) &&
                 (kindFilter == null || it.kind in kindFilter!!.kinds)
         }
     }
-    val groups = remember(scoped) { scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted() }
-    val visible = remember(scoped, channels, recent, section, group, query, kindFilter) {
+    // The Sport tab: the channels chosen in the Sport list, each in its best quality
+    val sportPicked = remember(scoped, sportSettings) { SportList.pick(scoped, sportSettings) }
+    val groups = remember(scoped, section) {
+        if (section == Section.Sport) emptyList() else scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    val visible = remember(scoped, sportPicked, channels, recent, section, group, query, kindFilter) {
         val base = when (section) {
-            Section.All, Section.Sport -> scoped
+            Section.All -> scoped
+            Section.Sport -> sportPicked
             Section.Favorites -> scoped.filter { it.favorite }
             Section.Recent -> {
                 val saved = channels.associateBy { it.url }
@@ -401,6 +408,9 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                             }
                             DropdownMenuItem(text = { Text("Clear recent") }, onClick = {
                                 moreMenu = false; store.clearRecent()
+                            })
+                            DropdownMenuItem(text = { Text("Edit Sport list") }, onClick = {
+                                moreMenu = false; dialog = HomeDialog.EditSport
                             })
                             HorizontalDivider()
                             DropdownMenuItem(text = { Text("Logs") }, onClick = {
@@ -531,7 +541,7 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
                         ChannelRow(
                             channel = ch,
-                            number = numbers[ch.url],
+                            number = if (section == Section.Sport) i + 1 else numbers[ch.url],
                             saved = numbers[ch.url] != null,
                             onClick = {
                                 if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
@@ -622,6 +632,11 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                 TextButton(onClick = { clipboard.setText(AnnotatedString(d.report)); dialog = null; notify("Details copied.") }) { Text("Copy details") }
             },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
+        )
+        HomeDialog.EditSport -> SportListEditor(
+            initial = sportSettings,
+            onDismiss = { dialog = null },
+            onSave = { sportStore.save(it); dialog = null; section = Section.Sport },
         )
         HomeDialog.Logs -> LogsScreen(
             onDismiss = { dialog = null },
@@ -894,7 +909,7 @@ private fun EmptyState(section: Section, filtered: Boolean) {
         filtered -> "No channels match your search."
         section == Section.Favorites -> "No favorites yet. Tap the star next to a channel to pin it here."
         section == Section.Recent -> "Channels you play will show up here."
-        section == Section.Sport -> "No sport channels yet. Channels whose folder or name contains “sport” show up here."
+        section == Section.Sport -> "No sport channels found. Tap ⋮ → Edit Sport list to choose which channels appear here."
         section == Section.Playlists -> ""
         else -> "No channels yet. Paste a stream link above, or import an M3U playlist with the + button."
     }
@@ -1265,4 +1280,42 @@ private fun LogsScreen(onDismiss: () -> Unit, onCopy: (String) -> Unit) {
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
     }
+}
+
+@Composable
+private fun SportListEditor(initial: SportSettings, onDismiss: () -> Unit, onSave: (SportSettings) -> Unit) {
+    var text by rememberSaveable { mutableStateOf(initial.text) }
+    var cap by rememberSaveable { mutableStateOf(initial.cap) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sport list") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "One channel per line, in the order you want. To show a different name, write “Name = channel name at your provider”. " +
+                        "Each channel is shown once, in the best quality allowed.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                )
+                Text("Quality", style = MaterialTheme.typography.labelLarge)
+                QualityCap.entries.forEach { option ->
+                    FilterChip(selected = cap == option, onClick = { cap = option }, label = { Text(option.label) })
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(SportSettings(text, cap)) }) { Text("Save") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { text = SportList.DEFAULT_TEXT; cap = QualityCap.Best }) { Text("Reset") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
 }
