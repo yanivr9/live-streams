@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -124,7 +127,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) importFromIntent(intent)
         val crash = App.takeCrashReport(this)
         setContent {
-            StreamDeskTheme { HomeScreen(store, ::openPlayer, crash) }
+            StreamDeskTheme(isTv = isTelevision()) { HomeScreen(store, ::openPlayer, crash) }
         }
     }
 
@@ -352,6 +355,16 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
     }
     val filterName = sources.firstOrNull { it.url == sourceFilter }?.name
 
+    // On a TV the remote needs something selected from the start: the first channel
+    val isTv = LocalIsTv.current
+    val firstRowFocus = remember { FocusRequester() }
+    LaunchedEffect(isTv, section, visible.firstOrNull()?.url) {
+        if (isTv && section != Section.Playlists && visible.isNotEmpty()) {
+            delay(250)
+            runCatching { firstRowFocus.requestFocus() }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -540,6 +553,7 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
                         ChannelRow(
+                            modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
                             channel = ch,
                             number = if (section == Section.Sport) i + 1 else numbers[ch.url],
                             saved = numbers[ch.url] != null,
@@ -830,6 +844,7 @@ private fun FormatPicker(format: StreamFormat, onPick: (StreamFormat) -> Unit, m
 
 @Composable
 private fun ChannelRow(
+    modifier: Modifier = Modifier,
     channel: Channel,
     number: Int?,
     saved: Boolean,
@@ -843,7 +858,7 @@ private fun ChannelRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
         leadingContent = { ChannelBadge(channel, number) },
         headlineContent = { Text(channel.displayName(), maxLines = 2, overflow = TextOverflow.Ellipsis) },

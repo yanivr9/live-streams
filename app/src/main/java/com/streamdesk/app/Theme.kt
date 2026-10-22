@@ -2,7 +2,11 @@ package com.streamdesk.app
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 
 val Amber = Color(0xFFFF9F1C)   // tally-light amber
@@ -30,5 +34,13 @@ private val DeskColors = darkColorScheme(
 )
 
 @Composable
-fun StreamDeskTheme(content: @Composable () -> Unit) =
-    MaterialTheme(colorScheme = DeskColors, content = content)
+fun StreamDeskTheme(isTv: Boolean = false, content: @Composable () -> Unit) {
+    // A TV is read from the sofa: scale everything up, and show the remote's selection
+    val base = LocalDensity.current
+    val density = if (isTv) Density(base.density * 1.3f, base.fontScale) else base
+    CompositionLocalProvider(LocalIsTv provides isTv, LocalDensity provides density) {
+        MaterialTheme(colorScheme = DeskColors) {
+            if (isTv) CompositionLocalProvider(LocalIndication provides TvFocusIndication, content = content) else content()
+        }
+    }
+}

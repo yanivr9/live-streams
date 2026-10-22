@@ -1,5 +1,6 @@
 package com.streamdesk.app
 
+import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -21,6 +22,17 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -144,6 +156,8 @@ class PlayerActivity : ComponentActivity() {
     private var inPip by mutableStateOf(false)
     private var controlsVisible by mutableStateOf(true)
     private var showStats by mutableStateOf(false)
+    private val isTv by lazy { isTelevision() }
+    private var listOpen by mutableStateOf(false)   // TV: the channel list opened with OK
     private var banner by mutableStateOf<String?>(null)   // "12 · channel name", shown briefly after switching channel
     private val bannerHandler = Handler(Looper.getMainLooper())
     private val hideBanner = Runnable { banner = null }
@@ -194,7 +208,7 @@ class PlayerActivity : ComponentActivity() {
         ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
         goFullscreen()
         addOnPictureInPictureModeChangedListener { inPip = it.isInPictureInPictureMode }
-        setContent { StreamDeskTheme { PlayerScreen() } }
+        setContent { StreamDeskTheme(isTv = isTv) { PlayerScreen() } }
 
         if (!loadFromIntent(intent)) {
             finish()
@@ -301,6 +315,7 @@ class PlayerActivity : ComponentActivity() {
         }
         requestedFormat = StreamFormat.entries.getOrElse(intent.getIntExtra(EXTRA_FORMAT, 0)) { StreamFormat.Auto }
         play(start)
+        if (isTv) showBanner()
         return true
     }
 
@@ -368,9 +383,33 @@ class PlayerActivity : ComponentActivity() {
     private fun zap(delta: Int) {
         if (queue.size < 2) return
         play((index + delta + queue.size) % queue.size)
+        showBanner()
+    }
+
+    private fun showBanner() {
         banner = "${index + 1} / ${queue.size}  ·  ${queue[index].displayName()}"
         bannerHandler.removeCallbacks(hideBanner)
-        bannerHandler.postDelayed(hideBanner, 2500)
+        bannerHandler.postDelayed(hideBanner, if (isTv) 4000 else 2500)
+    }
+
+    // TV remote: up/down change channel, OK opens the channel list (or retries after an error), Menu opens quality or stream info.
+    // Overriding here (not onKeyDown) catches the keys before any view does; lint's restriction is meant for library authors.
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isTv && !listOpen && event.action == KeyEvent.ACTION_DOWN) {
+            val action = TvKeys.map(event.keyCode)
+            if (action != null) {
+                if (event.repeatCount == 0) when (action) {
+                    TvAction.ChannelUp -> zap(1)
+                    TvAction.ChannelDown -> zap(-1)
+                    TvAction.Select -> if (status?.isError == true) play(index) else if (queue.size > 1) listOpen = true else showBanner()
+                    TvAction.Menu -> if (hasQualities) showQualityPicker() else showStats = !showStats
+                    TvAction.ShowInfo -> showBanner()
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     // Channel up/down keys, as on a Bluetooth remote or keyboard
@@ -565,6 +604,10 @@ class PlayerActivity : ComponentActivity() {
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = this@PlayerActivity.player
+                        if (isTv) {   // the remote is handled by the activity, not by the view
+                            isFocusable = false
+                            isFocusableInTouchMode = false
+                        }
                         keepScreenOn = true
                         setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
                         setShowSubtitleButton(true)
@@ -573,13 +616,15 @@ class PlayerActivity : ComponentActivity() {
                         })
                     }
                 },
-                update = { it.useController = !inPip },
+                update = { it.useController = !inPip && !isTv },
                 modifier = Modifier.fillMaxSize(),
             )
 
             if (inPip) return@Box
 
-            AnimatedVisibility(
+            BackHandler(enabled = listOpen) { listOpen = false }
+
+            if (!isTv) AnimatedVisibility(
                 visible = controlsVisible || status?.isError == true,
                 enter = fadeIn(),
                 exit = fadeOut(),
@@ -588,7 +633,7 @@ class PlayerActivity : ComponentActivity() {
                 TopBar(favorite)
             }
 
-            if (queue.size > 1) {
+            if (!isTv && queue.size > 1) {
                 AnimatedVisibility(
                     visible = controlsVisible,
                     enter = fadeIn(),
@@ -625,6 +670,10 @@ class PlayerActivity : ComponentActivity() {
                 StatusCard(s, Modifier.align(Alignment.Center))
             }
 
+            if (isTv && listOpen) {
+                ChannelPicker(Modifier.align(Alignment.CenterStart))
+            }
+
             if (showStats) {
                 StatsPanel(
                     Modifier
@@ -632,6 +681,59 @@ class PlayerActivity : ComponentActivity() {
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Top))
                         .padding(top = 72.dp, end = 12.dp)
                 )
+            }
+        }
+    }
+
+    /** TV: the channel list, opened with OK. Up/down to choose, OK to switch, Back to close. */
+    @Composable
+    private fun ChannelPicker(modifier: Modifier) {
+        val listState = rememberLazyListState(initialFirstVisibleItemIndex = (index - 3).coerceAtLeast(0))
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            delay(80)
+            runCatching { focus.requestFocus() }
+        }
+        Column(modifier.width(460.dp).fillMaxHeight().background(Color.Black.copy(alpha = 0.88f)).padding(vertical = 20.dp)) {
+            Text(
+                "Channels",
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
+                itemsIndexed(queue) { i, ch ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp)
+                            .then(if (i == index) Modifier.focusRequester(focus) else Modifier)
+                            .clickable {
+                                listOpen = false
+                                if (i != index) play(i)
+                                showBanner()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Text(
+                            "%02d".format(i + 1),
+                            fontFamily = FontFamily.Monospace,
+                            color = if (i == index) Amber else Color.White.copy(alpha = 0.55f),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                ch.displayName(),
+                                color = if (i == index) Amber else Color.White,
+                                fontWeight = if (i == index) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (ch.group.isNotBlank()) Text(ch.group, color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                        }
+                    }
+                }
             }
         }
     }
@@ -731,6 +833,7 @@ class PlayerActivity : ComponentActivity() {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Can't play this stream", style = MaterialTheme.typography.titleMedium, color = OnAir)
                 Text(s.text, style = MaterialTheme.typography.bodyMedium)
+                if (isTv) Text("Press OK to try again, or ▲ ▼ to change channel.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { play(index) }) { Text("Try again") }
                     if (queue.size > 1) OutlinedButton(onClick = { zap(1) }) { Text("Next channel") }
