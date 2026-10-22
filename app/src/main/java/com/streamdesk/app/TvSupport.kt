@@ -12,6 +12,8 @@ import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -71,10 +73,23 @@ object TvFocusIndication : IndicationNodeFactory {
 
         override fun ContentDrawScope.draw() {
             val corner = CornerRadius(8.dp.toPx())
-            if (focused) drawRoundRect(Amber.copy(alpha = 0.16f), cornerRadius = corner)
+            if (focused) drawRoundRect(Amber.copy(alpha = 0.30f), cornerRadius = corner)
             drawContent()
-            if (focused) drawRoundRect(Amber, cornerRadius = corner, style = Stroke(width = 3.dp.toPx()))
-            else if (pressed) drawRoundRect(Color.White.copy(alpha = 0.10f), cornerRadius = corner)
+            if (focused) {
+                // A white ring with an amber ring inside it: easy to see on any TV, whatever its contrast settings
+                val outer = 4.dp.toPx()
+                val inner = 2.dp.toPx()
+                drawRoundRect(
+                    Color.White, topLeft = Offset(outer / 2, outer / 2), size = Size(size.width - outer, size.height - outer),
+                    cornerRadius = corner, style = Stroke(width = outer),
+                )
+                drawRoundRect(
+                    Amber, topLeft = Offset(outer + inner / 2, outer + inner / 2), size = Size(size.width - 2 * outer - inner, size.height - 2 * outer - inner),
+                    cornerRadius = CornerRadius(4.dp.toPx()), style = Stroke(width = inner),
+                )
+            } else if (pressed) {
+                drawRoundRect(Color.White.copy(alpha = 0.10f), cornerRadius = corner)
+            }
         }
     }
 }

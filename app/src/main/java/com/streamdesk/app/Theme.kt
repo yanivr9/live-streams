@@ -39,7 +39,7 @@ fun StreamDeskTheme(isTv: Boolean = false, content: @Composable () -> Unit) {
     val base = LocalDensity.current
     val density = if (isTv) Density(base.density * 1.3f, base.fontScale) else base
     CompositionLocalProvider(LocalIsTv provides isTv, LocalDensity provides density) {
-        MaterialTheme(colorScheme = DeskColors) {
+        MaterialTheme(colorScheme = if (isTv) DeskColors.copy(onSurfaceVariant = Color(0xFFC4CDD2)) else DeskColors) {
             if (isTv) CompositionLocalProvider(LocalIndication provides TvFocusIndication, content = content) else content()
         }
     }

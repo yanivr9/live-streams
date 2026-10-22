@@ -797,7 +797,7 @@ class PlayerActivity : ComponentActivity() {
             delay(80)
             runCatching { focus.requestFocus() }
         }
-        Column(modifier.width(460.dp).fillMaxHeight().background(Color.Black.copy(alpha = 0.88f)).padding(vertical = 20.dp)) {
+        Column(modifier.width(460.dp).fillMaxHeight().background(Color.Black.copy(alpha = 0.94f)).padding(vertical = 20.dp)) {
             Text(
                 "Channels",
                 color = Color.White.copy(alpha = 0.7f),
@@ -821,9 +821,9 @@ class PlayerActivity : ComponentActivity() {
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Text(
-                            "%02d".format(i + 1),
+                            if (i == index) "▶" else "%02d".format(i + 1),
                             fontFamily = FontFamily.Monospace,
-                            color = if (i == index) Amber else Color.White.copy(alpha = 0.55f),
+                            color = if (i == index) Amber else Color.White.copy(alpha = 0.75f),
                         )
                         Column(Modifier.weight(1f)) {
                             Text(
@@ -833,7 +833,7 @@ class PlayerActivity : ComponentActivity() {
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (ch.group.isNotBlank()) Text(ch.group, color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                            if (ch.group.isNotBlank()) Text(ch.group, color = Color.White.copy(alpha = 0.78f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                         }
                     }
                 }
