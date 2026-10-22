@@ -111,7 +111,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -882,23 +882,30 @@ private fun ChannelRow(
 
 @Composable
 private fun ChannelBadge(channel: Channel, number: Int?) {
+    val hasLogo = channel.logo.startsWith("http") || channel.logo.startsWith("file:///android_asset/")
     Box(
-        Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+        Modifier.size(width = 64.dp, height = 44.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            number?.let { "%02d".format(it) } ?: "–",
-            fontFamily = FontFamily.Monospace,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (channel.logo.isNotBlank()) {
-            AsyncImage(
+        val numberText: @Composable () -> Unit = {
+            Text(
+                number?.let { "%02d".format(it) } ?: "–",
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (hasLogo) {
+            SubcomposeAsyncImage(
                 model = channel.logo,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp),
+                modifier = Modifier.fillMaxSize().padding(3.dp),
+                loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { numberText() } },
+                error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { numberText() } },
             )
+        } else {
+            numberText()
         }
     }
 }

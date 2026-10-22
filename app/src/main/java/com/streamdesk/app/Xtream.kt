@@ -88,6 +88,9 @@ data class XtreamLogin(
     }
 }
 
+/** Providers sometimes send junk (even a lone "[") in their logo fields. */
+private fun webAddress(s: String) = s.trim().takeIf { it.startsWith("http://") || it.startsWith("https://") }.orEmpty()
+
 private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
 /**
@@ -191,7 +194,7 @@ object Xtream {
                 url = "${login.base}live/$path/$id.$liveExt",
                 name = o.optString("name").ifBlank { "Channel $id" },
                 group = cats[o.optString("category_id")].orEmpty(),
-                logo = o.optString("stream_icon"),
+                logo = webAddress(o.optString("stream_icon")),
                 kind = Kind.LIVE,
             )
         }
@@ -201,7 +204,7 @@ object Xtream {
                 url = "${login.base}movie/$path/$id.${o.optString("container_extension").ifBlank { "mp4" }}",
                 name = o.optString("name").ifBlank { "Movie $id" },
                 group = cats[o.optString("category_id")].orEmpty(),
-                logo = o.optString("stream_icon"),
+                logo = webAddress(o.optString("stream_icon")),
                 kind = Kind.MOVIE,
             )
         }
@@ -212,7 +215,7 @@ object Xtream {
                 url = login.api("get_series_info", "&series_id=$id"),
                 name = o.optString("name").ifBlank { "Series $id" },
                 group = cats[o.optString("category_id")].orEmpty(),
-                logo = o.optString("cover"),
+                logo = webAddress(o.optString("cover")),
                 kind = Kind.SERIES,
             )
         }

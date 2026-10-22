@@ -9,7 +9,8 @@ class SportListTest {
         "IL: YES SPORT 1", "IL: YES SPORT 1 FHD", "IL: YES SPORT 1 HD", "IL: YES SPORT 10 HD",
         "IL: YES SPORT 2 FHD", "IL: YES SPORT 2 HD", "IL: YES SPORT 3 FHD", "IL: YES SPORT 4 HD", "IL: YES SPORT 6 FHD",
         "IL: Sport 5 4K HDR", "IL: Sport 5 4K", "IL: Sport 5 FHD P50", "IL: Sport 5 FHD", "IL: Sport 5 HD", "IL: Sport 5 SD",
-        "IL: Sport 5+ Live 4K", "IL: Sport 5 Plus FHD", "IL: Sport 5 Gold", "IL: Sport 5+ UHD 4K",
+        "IL: Sport 5+ Live 4K", "IL: Sport 5+ Live FHD", "IL: Sport 5+ Live HD", "IL: Sport 5+ Stars FHD P50", "IL: Sport 5+ Stars HD",
+        "IL: Sport 5 Plus FHD", "IL: Sport 5 Plus", "IL: Sport 5 Gold", "IL: Sport 5+ UHD 4K", "IL: Sport 5+ Max FHD", "IL: Sport 5+ Plus 4K",
         "IL: ONE 1 4K", "IL: ONE 1 FHD P50", "IL: ONE 1 FHD", "IL: ONE 1 HD", "IL: ONE 2 HD", "IL: ONE 2 FHD",
         "IL: ONE DOCO FHD", "IL: HOT Cinema",
     )
@@ -21,7 +22,7 @@ class SportListTest {
     @Test
     fun picksEightChannelsInOrderWithLabels() {
         assertEquals(
-            listOf("Sport 1", "Sport 2", "Sport 3", "Sport 4", "Sport 5", "Sport 6", "ONE 1", "ONE 2"),
+            listOf("Sport 1", "Sport 2", "Sport 3", "Sport 4", "Sport 5", "Sport 5+", "Sport 5 Live", "Sport 5 Stars", "Sport 6", "ONE 1", "ONE 2"),
             pick(QualityCap.Best).map { it.name },
         )
     }
@@ -31,10 +32,30 @@ class SportListTest {
         val picked = pick(QualityCap.Best).associateBy { it.name }
         assertEquals(urlOf("IL: YES SPORT 1 FHD"), picked.getValue("Sport 1").url)
         assertEquals(urlOf("IL: YES SPORT 2 FHD"), picked.getValue("Sport 2").url)
-        assertEquals(urlOf("IL: Sport 5 4K HDR"), picked.getValue("Sport 5").url)   // not "Sport 5+ UHD 4K", Gold, Plus…
+        assertEquals(urlOf("IL: Sport 5 4K HDR"), picked.getValue("Sport 5").url)   // not "Sport 5+", Gold, Plus…
         assertEquals("4K HDR", picked.getValue("Sport 5").group)
         assertEquals(urlOf("IL: ONE 1 4K"), picked.getValue("ONE 1").url)
         assertEquals(urlOf("IL: ONE 2 FHD"), picked.getValue("ONE 2").url)
+    }
+
+    @Test
+    fun sportFivePlusLiveAndStars() {
+        val picked = pick(QualityCap.Best).associateBy { it.name }
+        assertEquals(urlOf("IL: Sport 5+ UHD 4K"), picked.getValue("Sport 5+").url)            // not "Sport 5+ Max", "Plus 4K" or "Gold"
+        assertEquals(urlOf("IL: Sport 5+ Live 4K"), picked.getValue("Sport 5 Live").url)
+        assertEquals(urlOf("IL: Sport 5+ Stars FHD P50"), picked.getValue("Sport 5 Stars").url)
+        // "Sport 5 Plus" is the same channel under another name
+        val named = SportList.pick(channels.filter { it.name.contains("5 Plus") }, SportSettings("Sport 5+ = Sport 5+ | Sport 5 Plus", QualityCap.Best))
+        assertEquals(listOf(urlOf("IL: Sport 5 Plus FHD")), named.map { it.url })
+    }
+
+    @Test
+    fun everyListedChannelHasItsLogo() {
+        val picked = pick(QualityCap.Best)
+        val expected = listOf("sport1", "sport2", "sport3", "sport4", "sport5", "sport5plus", "sport5live", "sport5stars", "sport6", "one1", "one2")
+        assertEquals(expected.map { "file:///android_asset/logos/$it.png" }, picked.map { it.logo })
+        // ...and the files are really in the app
+        for (name in expected) assertEquals(true, java.io.File("src/main/assets/logos/$name.png").exists())
     }
 
     @Test

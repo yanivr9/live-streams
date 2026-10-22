@@ -19,8 +19,24 @@ data class SportSettings(val text: String, val cap: QualityCap)
  * ("ONE 1 4K", "ONE 1 FHD", "ONE 1 HD"); the list shows each channel once, in the best quality allowed.
  */
 object SportList {
-    // "Label = name at the provider". Sport 1–4 and 6 are called "YES SPORT" by this provider.
+    // "Label = name at the provider" (several names may be separated by "|"). Sport 1–4 and 6 are called "YES SPORT" by this provider.
     val DEFAULT_TEXT = """
+        Sport 1 = YES SPORT 1
+        Sport 2 = YES SPORT 2
+        Sport 3 = YES SPORT 3
+        Sport 4 = YES SPORT 4
+        Sport 5 = Sport 5
+        Sport 5+ = Sport 5+ | Sport 5 Plus
+        Sport 5 Live = Sport 5+ Live
+        Sport 5 Stars = Sport 5+ Stars
+        Sport 6 = YES SPORT 6
+        ONE 1
+        ONE 2
+    """.trimIndent()
+
+    /** Earlier defaults: a phone that still has one of these (never edited) gets the new default. */
+    val OLD_DEFAULT_TEXTS = listOf(
+        """
         Sport 1 = YES SPORT 1
         Sport 2 = YES SPORT 2
         Sport 3 = YES SPORT 3
@@ -29,22 +45,40 @@ object SportList {
         Sport 6 = YES SPORT 6
         ONE 1
         ONE 2
-    """.trimIndent()
+        """.trimIndent(),
+    )
+
+    private const val LOGO_DIR = "file:///android_asset/logos/"
+
+    // Channel logos shipped with the app (the provider's own logo field is empty or broken for these channels)
+    private val LOGOS = mapOf(
+        "SPORT 1" to "sport1", "SPORT 2" to "sport2", "SPORT 3" to "sport3", "SPORT 4" to "sport4",
+        "SPORT 5" to "sport5", "SPORT 6" to "sport6",
+        "SPORT 5+" to "sport5plus", "SPORT 5 PLUS" to "sport5plus",
+        "SPORT 5 LIVE" to "sport5live", "SPORT 5+ LIVE" to "sport5live",
+        "SPORT 5 STARS" to "sport5stars", "SPORT 5+ STARS" to "sport5stars",
+        "ONE 1" to "one1", "ONE 2" to "one2",
+    )
+
+    private fun logoFor(entry: Entry): String? =
+        (listOf(entry.label) + entry.patterns).firstNotNullOfOrNull { key ->
+            LOGOS[key.trim().uppercase().removePrefix("YES ").trim()]
+        }?.let { "$LOGO_DIR$it.png" }
 
     val DEFAULT = SportSettings(DEFAULT_TEXT, QualityCap.Best)
 
     // Words that only describe picture quality; anything else after the name means a different channel
     private val QUALITY_WORDS = setOf("4K", "UHD", "HDR", "FHD", "HD", "SD", "P50", "P60", "HEVC", "H265", "[MULTI-SUB]")
 
-    private data class Entry(val label: String, val pattern: String)
+    private data class Entry(val label: String, val patterns: List<String>)
     private data class Quality(val score: Double, val label: String)
 
     private fun parse(text: String): List<Entry> = text.lines().map { it.trim() }
         .filter { it.isNotEmpty() && !it.startsWith("#") }
         .mapNotNull { line ->
             val label = line.substringBefore('=').trim()
-            val pattern = if ('=' in line) line.substringAfter('=').trim() else label
-            if (pattern.isEmpty()) null else Entry(label.ifEmpty { pattern }, pattern)
+            val patterns = (if ('=' in line) line.substringAfter('=') else line).split('|').map { it.trim() }.filter { it.isNotEmpty() }
+            if (patterns.isEmpty()) null else Entry(label.ifEmpty { patterns.first() }, patterns)
         }
 
     /** The quality of [channel] if it is the channel [pattern] (in any quality), otherwise null. */
@@ -81,12 +115,14 @@ object SportList {
         val entries = parse(settings.text)
         if (entries.isEmpty()) return channels.filter { it.isSport() }
         return entries.mapNotNull { entry ->
-            val options = channels.mapNotNull { c -> qualityIfMatches(c, entry.pattern)?.let { c to it } }
+            val options = channels.mapNotNull { c ->
+                entry.patterns.firstNotNullOfOrNull { qualityIfMatches(c, it) }?.let { c to it }
+            }
             if (options.isEmpty()) return@mapNotNull null
             val allowed = options.filter { it.second.score <= settings.cap.maxScore }
             // Nothing within the limit: take the lowest quality there is
             val (channel, quality) = if (allowed.isNotEmpty()) allowed.maxBy { it.second.score } else options.minBy { it.second.score }
-            channel.copy(name = entry.label, group = quality.label)
+            channel.copy(name = entry.label, group = quality.label, logo = logoFor(entry) ?: channel.logo)
         }
     }
 }
@@ -97,7 +133,7 @@ class SportSettingsStore private constructor(context: Context) {
 
     private val _settings = MutableStateFlow(
         SportSettings(
-            text = prefs.getString("text", null) ?: SportList.DEFAULT_TEXT,
+            text = prefs.getString("text", null)?.takeIf { it !in SportList.OLD_DEFAULT_TEXTS } ?: SportList.DEFAULT_TEXT,
             cap = runCatching { QualityCap.valueOf(prefs.getString("cap", null).orEmpty()) }.getOrDefault(QualityCap.Best),
         )
     )
