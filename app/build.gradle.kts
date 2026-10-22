@@ -16,6 +16,14 @@ android {
         versionName = "2.6"
     }
 
+    // Keep every build signed with the same key, so a new version always installs over the old one
+    signingConfigs {
+        getByName("debug") {
+            val keystore = rootProject.file("debug.keystore")
+            if (keystore.exists()) storeFile = keystore
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
