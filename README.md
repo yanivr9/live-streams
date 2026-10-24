@@ -30,6 +30,8 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   with the same channel on the phone, so only one screen uses the account at a time.
 - **Auto-reconnect**: a live stream that ends, errors or freezes for 25 s reconnects up to 12 times (1, 2, 4 and 8 s apart, then every 8 s).
 - **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
+- **TV guide**: the Guide tab lists today's and tomorrow's programs on all Sport channels in time order (OK on a program
+  that's on now plays it). Each IPTV channel's menu also has "TV guide" for its full schedule.
 - **Open on last channel** (TV): starting the app goes straight to the channel you watched last. ⋮ → Open on last channel turns it off.
 - **Updates in the app**: ⋮ → Check for updates (and once when the app opens). It reads `dist/update.json` from the repo, downloads the APK it names and opens Android's installer. The link must be reachable without signing in, so the repo has to be public; see `Updates.UPDATE_URL`.
 - Opens stream links shared from other apps or tapped in a browser, and `.m3u` files from a file manager.
@@ -77,6 +79,7 @@ For the Play Store you need a release build signed with your own key (`./gradlew
 | `LinkAndroid.kt` | Finding the TV (NSD), pairing code, handling what the phone sends |
 | `LinkUi.kt` | TV picker and "Link a phone" screens |
 | `SportList.kt` | The Sport tab: chosen channels, best quality, logos |
-| `Epg.kt` | What's on now, from the provider's guide |
+| `Epg.kt` | The provider's guide: what's on now, days |
+| `GuideUi.kt` | Guide tab and a channel's schedule |
 | `Update.kt`, `UpdateUi.kt` | In-app update: check, download, install |
 | `Resume.kt` | Open on the last channel (TV) |

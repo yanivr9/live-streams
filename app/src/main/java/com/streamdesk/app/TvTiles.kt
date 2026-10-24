@@ -58,6 +58,7 @@ fun ChannelTile(
     removeLabel: String,
     modifier: Modifier = Modifier,
     nowOn: String? = null,
+    onGuide: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -144,6 +145,7 @@ fun ChannelTile(
             )
         }
         DropdownMenu(menu, onDismissRequest = { menu = false }) {
+            if (onGuide != null) AppMenuItem(text = { Text("TV guide") }, onClick = { menu = false; onGuide() })
             AppMenuItem(text = { Text(if (channel.favorite) "Remove from favorites" else "Add to favorites") }, onClick = { menu = false; onToggleFavorite() })
             if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
             else AppMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })

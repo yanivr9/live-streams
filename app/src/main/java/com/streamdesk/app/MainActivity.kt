@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Section(val label: String) {
-    All("All"), Sport("Sport"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
+    All("All"), Sport("Sport"), Guide("Guide"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
 }
 
 private sealed interface HomeDialog {
@@ -197,6 +197,7 @@ private sealed interface HomeDialog {
     data class Invite(val invite: LinkInvite) : HomeDialog
     data class PickTv(val job: TvJob) : HomeDialog
     data class Update(val info: UpdateInfo) : HomeDialog
+    data class Guide(val channel: Channel, val login: XtreamLogin) : HomeDialog
 }
 
 /** Live TV / Movies / Series filter; Episode items only appear in Recent. */
@@ -417,6 +418,11 @@ private fun HomeScreen(
     }
     // The Sport tab: the channels chosen in the Sport list, each in its best quality
     val sportPicked = remember(scoped, sportSettings) { SportList.pick(scoped, sportSettings) }
+    fun loginFor(ch: Channel): XtreamLogin? = if (ch.kind == Kind.LIVE) sources.firstOrNull { it.url == ch.source }?.xtream else null
+    fun playSport(ch: Channel) {
+        val i = sportPicked.indexOfFirst { it.url == ch.url }
+        if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
+    }
     // What's on now, from the provider's guide; refreshed every few minutes
     var guide by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     LaunchedEffect(sportPicked, sources) {
@@ -443,7 +449,7 @@ private fun HomeScreen(
                 val saved = channels.associateBy { it.url }
                 recent.map { saved[it.url] ?: it }.filter { kindFilter == null || it.kind in kindFilter!!.kinds }
             }
-            Section.Playlists -> emptyList()
+            Section.Playlists, Section.Guide -> emptyList()
         }
         base.filter {
             (group == null || it.group == group) &&
@@ -634,6 +640,16 @@ private fun HomeScreen(
                 }
             }
 
+            if (section == Section.Guide) {
+                SportGuidePane(
+                    channels = sportPicked,
+                    loginFor = ::loginFor,
+                    onPlay = ::playSport,
+                    onNotYet = { ch, p -> notify("“${p.title}” starts at ${Epg.clock(p.start)} on ${ch.displayName()}.") },
+                    modifier = Modifier.weight(1f),
+                )
+                return@Column
+            }
             if (section == Section.Playlists) {
                 PlaylistsPane(
                     sources = sources,
@@ -743,6 +759,7 @@ private fun HomeScreen(
                             onRemove = { if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url) },
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
                             nowOn = guide[ch.url],
+                            onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
                         )
                     }
                 }
@@ -774,6 +791,7 @@ private fun HomeScreen(
                             },
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
                             nowOn = guide[ch.url],
+                            onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
@@ -881,6 +899,7 @@ private fun HomeScreen(
             onSave = { sportStore.save(it); dialog = null; section = Section.Sport },
         )
         is HomeDialog.Update -> UpdateDialog(d.info, onDismiss = { dialog = null })
+        is HomeDialog.Guide -> ChannelGuideDialog(d.channel, d.login, onPlay = { dialog = null; playSport(d.channel) }, onDismiss = { dialog = null })
         HomeDialog.Logs -> LogsScreen(
             onDismiss = { dialog = null },
             onCopy = { clipboard.setText(AnnotatedString(it)); notify("Logs copied. Passwords are hidden.") },
@@ -1090,6 +1109,7 @@ private fun ChannelRow(
     onRemove: () -> Unit,
     removeLabel: String,
     nowOn: String? = null,
+    onGuide: (() -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
@@ -1128,6 +1148,7 @@ private fun ChannelRow(
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
                         else AppMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })
+                        if (onGuide != null) AppMenuItem(text = { Text("TV guide") }, onClick = { menu = false; onGuide() })
                         if (onPlayOnTv != null) AppMenuItem(text = { Text("Play on TV") }, onClick = { menu = false; onPlayOnTv() })
                         AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy() })
                         AppMenuItem(text = { Text(removeLabel) }, onClick = { menu = false; onRemove() })
@@ -1175,7 +1196,7 @@ private fun EmptyState(section: Section, filtered: Boolean) {
         section == Section.Favorites -> "No favorites yet. Tap the star next to a channel to pin it here."
         section == Section.Recent -> "Channels you play will show up here."
         section == Section.Sport -> "No sport channels found. Tap ⋮ → Edit Sport list to choose which channels appear here."
-        section == Section.Playlists -> ""
+        section == Section.Playlists || section == Section.Guide -> ""
         else -> "No channels yet. Paste a stream link above, or import an M3U playlist with the + button."
     }
     Text(

@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.util.Base64
+import java.util.TimeZone
 
 class GuideUpdateTest {
     private fun b64(s: String) = Base64.getEncoder().encodeToString(s.toByteArray())
@@ -47,5 +48,25 @@ class GuideUpdateTest {
         val sport = listOf(ch(1), ch(2), ch(3))
         assertEquals(sport to 1, Resume.queue(ch(2), sport))
         assertEquals(listOf(ch(9)) to 0, Resume.queue(ch(9), sport))
+    }
+
+    @Test
+    fun splitsTheGuideIntoDays() {
+        val tz = TimeZone.getTimeZone("Asia/Jerusalem")   // UTC+3 in this date range
+        val now = 1_761_400_800L                         // 2025-10-25 17:00 local
+        val list = listOf(
+            Program("Earlier", now - 7200, now - 3600),    // over: left out
+            Program("On now", now - 600, now + 600),
+            Program("Late", now + 6 * 3600, now + 7 * 3600),     // 23:00 today
+            Program("Night", now + 8 * 3600, now + 9 * 3600),    // 01:00 tomorrow
+            Program("Later", now + 50 * 3600, now + 51 * 3600),
+        )
+        val days = Epg.days(list, now, tz)
+        assertEquals(listOf("Today", "Tomorrow"), days.take(2).map { it.label })
+        assertEquals(listOf("On now", "Late"), days[0].programs.map { it.title })
+        assertEquals(listOf("Night"), days[1].programs.map { it.title })
+        assertEquals(3, days.size)
+        assertEquals(true, list[1].isOn(now))
+        assertEquals(false, list[2].isOn(now))
     }
 }
