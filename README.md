@@ -26,7 +26,10 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   codes are locked out. Scanning the QR code with the phone's camera opens a page on the TV with a button that starts
   Stream Desk on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
   send the login.
-- **Auto-reconnect**: a live stream that drops reconnects up to 5 times (after 1, 2, 4, 8 and 16 s).
+- **Auto-reconnect**: a live stream that ends, errors or freezes for 25 s reconnects up to 12 times (1, 2, 4 and 8 s apart, then every 8 s).
+- **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
+- **Open on last channel** (TV): starting the app goes straight to the channel you watched last. ⋮ → Open on last channel turns it off.
+- **Updates in the app**: ⋮ → Check for updates (and once when the app opens). It reads `dist/update.json` from the repo, downloads the APK it names and opens Android's installer. The link must be reachable without signing in, so the repo has to be public; see `Updates.UPDATE_URL`.
 - Opens stream links shared from other apps or tapped in a browser, and `.m3u` files from a file manager.
 
 Not supported: UDP/RTP multicast, SRT, MMS and DRM-protected streams.
@@ -72,3 +75,6 @@ For the Play Store you need a release build signed with your own key (`./gradlew
 | `LinkAndroid.kt` | Finding the TV (NSD), pairing code, handling what the phone sends |
 | `LinkUi.kt` | TV picker and "Link a phone" screens |
 | `SportList.kt` | The Sport tab: chosen channels, best quality, logos |
+| `Epg.kt` | What's on now, from the provider's guide |
+| `Update.kt`, `UpdateUi.kt` | In-app update: check, download, install |
+| `Resume.kt` | Open on the last channel (TV) |

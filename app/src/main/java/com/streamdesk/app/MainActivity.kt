@@ -133,6 +133,7 @@ class MainActivity : ComponentActivity() {
         val store = ChannelStore.get(this)
         if (savedInstanceState == null) importFromIntent(intent)
         val crash = App.takeCrashReport(this)
+        if (savedInstanceState == null && isTelevision() && intent.action == Intent.ACTION_MAIN && Resume.enabled(this)) resumeLast(store)
         setContent {
             StreamDeskTheme(isTv = isTelevision()) { HomeScreen(store, ::openPlayer, crash, invite) { invite = null } }
         }
@@ -156,6 +157,14 @@ class MainActivity : ComponentActivity() {
         val text = runCatching { readText(this, uri) }.getOrNull()
         val msg = if (text == null) "Couldn't read that playlist file." else importText(ChannelStore.get(this), text)
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+    }
+
+    /** On a TV: straight to the channel watched last, with the Sport list as the channels to switch between. */
+    private fun resumeLast(store: ChannelStore) {
+        val last = store.recent.value.firstOrNull { it.kind == Kind.LIVE } ?: return
+        val sport = SportList.pick(store.channels.value, SportSettingsStore.get(this).settings.value)
+        val (queue, index) = Resume.queue(last, sport)
+        openPlayer(queue, index, StreamFormat.Auto)
     }
 
     private fun openPlayer(queue: List<Channel>, index: Int, format: StreamFormat) {
@@ -187,6 +196,7 @@ private sealed interface HomeDialog {
     data object Search : HomeDialog
     data class Invite(val invite: LinkInvite) : HomeDialog
     data class PickTv(val job: TvJob) : HomeDialog
+    data class Update(val info: UpdateInfo) : HomeDialog
 }
 
 /** Live TV / Movies / Series filter; Episode items only appear in Recent. */
@@ -335,6 +345,12 @@ private fun HomeScreen(
     }
 
     LaunchedEffect(invite) { invite?.let { dialog = HomeDialog.Invite(it) } }
+    // A new version, if there is one: ask once when the app opens
+    LaunchedEffect(Unit) {
+        val found = runCatching { Updates.check(context) }.getOrNull()
+        if (found != null && dialog == null) dialog = HomeDialog.Update(found)
+    }
+    var openLast by remember { mutableStateOf(Resume.enabled(context)) }
 
     fun playLink(link: String) = onPlay(listOf(store.find(link) ?: Channel(link, nameFromUrl(link))), 0, format)
 
@@ -392,6 +408,20 @@ private fun HomeScreen(
     }
     // The Sport tab: the channels chosen in the Sport list, each in its best quality
     val sportPicked = remember(scoped, sportSettings) { SportList.pick(scoped, sportSettings) }
+    // What's on now, from the provider's guide; refreshed every few minutes
+    var guide by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    LaunchedEffect(sportPicked, sources) {
+        while (true) {
+            val next = HashMap<String, String>()
+            for (ch in sportPicked) {
+                val login = sources.firstOrNull { it.url == ch.source }?.xtream ?: continue
+                val programs = runCatching { Epg.load(login, ch.url) }.getOrDefault(emptyList())
+                Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { next[ch.url] = it }
+            }
+            guide = next
+            delay(3 * 60_000L)
+        }
+    }
     val groups = remember(scoped, section) {
         if (section == Section.Sport) emptyList() else scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
     }
@@ -482,6 +512,24 @@ private fun HomeScreen(
                             }
                             AppMenuItem(text = { Text("Edit Sport list") }, onClick = {
                                 moreMenu = false; dialog = HomeDialog.EditSport
+                            })
+                            if (LocalIsTv.current) {
+                                AppMenuItem(text = { Text("Open on last channel: " + if (openLast) "On" else "Off") }, onClick = {
+                                    moreMenu = false; openLast = !openLast; Resume.setEnabled(context, openLast)
+                                })
+                            }
+                            AppMenuItem(text = { Text("Check for updates") }, onClick = {
+                                moreMenu = false
+                                scope.launch {
+                                    try {
+                                        val found = Updates.check(context)
+                                        if (found != null) dialog = HomeDialog.Update(found)
+                                        else notify("You have the latest version.")
+                                    } catch (e: Exception) {
+                                        AppLog.e("update", "Check failed: ${e.message}")
+                                        notify("Couldn't check for updates.")
+                                    }
+                                }
                             })
                             HorizontalDivider()
                             AppMenuItem(text = { Text("Logs") }, onClick = {
@@ -680,6 +728,7 @@ private fun HomeScreen(
                             onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
                             onRemove = { if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url) },
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
+                            nowOn = guide[ch.url],
                         )
                     }
                 }
@@ -710,6 +759,7 @@ private fun HomeScreen(
                                 if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url)
                             },
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
+                            nowOn = guide[ch.url],
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
@@ -816,6 +866,7 @@ private fun HomeScreen(
             onDismiss = { dialog = null },
             onSave = { sportStore.save(it); dialog = null; section = Section.Sport },
         )
+        is HomeDialog.Update -> UpdateDialog(d.info, onDismiss = { dialog = null })
         HomeDialog.Logs -> LogsScreen(
             onDismiss = { dialog = null },
             onCopy = { clipboard.setText(AnnotatedString(it)); notify("Logs copied. Passwords are hidden.") },
@@ -1024,6 +1075,7 @@ private fun ChannelRow(
     onPlayOnTv: (() -> Unit)?,
     onRemove: () -> Unit,
     removeLabel: String,
+    nowOn: String? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
@@ -1040,14 +1092,14 @@ private fun ChannelRow(
         headlineContent = { Text(channel.displayName(), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             // Channels from a playlist or login have long stream addresses with account details: show only the folder
-            val detail = if (channel.source.isNotEmpty()) channel.group else listOf(channel.group, channel.url).filter { it.isNotBlank() }.joinToString(" · ")
+            val detail = nowOn ?: if (channel.source.isNotEmpty()) channel.group else listOf(channel.group, channel.url).filter { it.isNotBlank() }.joinToString(" · ")
             if (detail.isNotBlank()) {
                 Text(
                     detail,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
-                    fontFamily = if (channel.source.isNotEmpty()) FontFamily.Default else FontFamily.Monospace,
+                    fontFamily = if (nowOn != null || channel.source.isNotEmpty()) FontFamily.Default else FontFamily.Monospace,
                 )
             }
         },

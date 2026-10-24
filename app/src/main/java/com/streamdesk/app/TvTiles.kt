@@ -57,6 +57,7 @@ fun ChannelTile(
     onRemove: () -> Unit,
     removeLabel: String,
     modifier: Modifier = Modifier,
+    nowOn: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -127,7 +128,7 @@ fun ChannelTile(
             )
             val detail = if (channel.source.isNotEmpty() || channel.url.isBlank()) channel.group else channel.group.ifBlank { "" }
             Text(
-                detail.ifBlank { " " },
+                (nowOn ?: detail).ifBlank { " " },
                 color = soft,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
