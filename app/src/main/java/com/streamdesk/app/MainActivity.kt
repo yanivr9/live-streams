@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -398,6 +399,11 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                     }
                 },
                 actions = {
+                    if (LocalIsTv.current) {
+                        IconButton(onClick = { dialog = HomeDialog.LinkPhone }) {
+                            Icon(Icons.Default.Cast, contentDescription = "Link a phone")
+                        }
+                    }
                     Box {
                         IconButton(onClick = { importMenu = true }) {
                             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
@@ -464,6 +470,9 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            if (isTv && sources.isEmpty()) {
+                LinkPhoneCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
             if (showLinkBar) {
                 // Open network stream (or a playlist link)
                 Row(

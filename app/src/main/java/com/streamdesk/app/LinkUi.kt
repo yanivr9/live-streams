@@ -1,6 +1,9 @@
 package com.streamdesk.app
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -154,6 +157,36 @@ fun TvPickerDialog(title: String, onDismiss: () -> Unit, onChosen: (TvDevice, St
     )
 }
 
+/** TV: on the first screen, until a playlist is loaded: how to connect the phone, with the code in plain sight. */
+@Composable
+fun LinkPhoneCard(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val code = remember { LinkReceiver.code(context) }
+    val address = remember { LinkReceiver.address() }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(2.dp, Amber),
+    ) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Connect your phone, so you don't type with the remote", fontWeight = FontWeight.Bold)
+                Text(
+                    "On your phone: Stream Desk → Playlists → ⋮ next to your account → Send login to TV. Choose this TV and type the code." +
+                        (if (address != null) "  If it isn't listed, use the address $address." else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("CODE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(code.chunked(3).joinToString(" "), fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
+            }
+        }
+    }
+}
+
 /** TV: shows the code and address a phone needs. */
 @Composable
 fun LinkPhoneDialog(onDismiss: () -> Unit) {
@@ -165,7 +198,7 @@ fun LinkPhoneDialog(onDismiss: () -> Unit) {
         title = { Text("Link a phone") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("On your phone: open Stream Desk, tap ⋮ on a channel → Play on TV, choose this TV and type this code.")
+                Text("On your phone: open Stream Desk → Playlists → ⋮ next to your account → Send login to TV (or ⋮ on a channel → Play on TV). Choose this TV and type this code.")
                 Text(code.chunked(3).joinToString(" "), fontSize = 40.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
                 Text(
                     if (address != null) "If the phone can't find the TV, type this address: $address"

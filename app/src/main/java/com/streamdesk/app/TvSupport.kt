@@ -43,7 +43,9 @@ import kotlinx.coroutines.launch
 /** True on a TV box such as the Xiaomi Mi Box: operated with a remote, not by touch. */
 fun Context.isTelevision(): Boolean {
     val mode = (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)?.currentModeType
-    return mode == Configuration.UI_MODE_TYPE_TELEVISION || !packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+    return mode == Configuration.UI_MODE_TYPE_TELEVISION ||
+        packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+        !packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
 }
 
 val LocalIsTv = staticCompositionLocalOf { false }
