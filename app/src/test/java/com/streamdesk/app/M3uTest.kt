@@ -108,4 +108,14 @@ class M3uTest {
         assertEquals(true, ch("ערוץ ספורט 5").isSport())
         assertEquals(false, ch("IL: HOT Cinema", "Hebrew - HOT").isSport())
     }
+
+    @Test
+    fun recognisesLiveStreamsAndPacesReconnects() {
+        assertEquals(true, looksLikeLiveStream("http://h:8080/live/u/p/123.ts", Kind.LIVE))
+        assertEquals(true, looksLikeLiveStream("http://h/stream/channel.ts?token=1", Kind.LIVE))
+        assertEquals(false, looksLikeLiveStream("http://h:8080/movie/u/p/9.mkv", Kind.MOVIE))      // a movie
+        assertEquals(false, looksLikeLiveStream("http://h:8080/series/u/p/9.mp4", Kind.EPISODE))   // an episode
+        assertEquals(false, looksLikeLiveStream("https://media.example/trailer.mp4", Kind.LIVE))   // a plain video file
+        assertEquals(listOf(1000L, 2000L, 4000L, 8000L, 8000L, 8000L), (1..6).map { Recovery.delayMs(it) })
+    }
 }

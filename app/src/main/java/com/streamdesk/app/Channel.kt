@@ -116,6 +116,18 @@ fun nameFromUrl(url: String): String {
     return if (last == null) host else "$host · $last"
 }
 
+/** Live TV from an IPTV provider: a link with /live/ in it or a .ts stream, as opposed to a movie file or an episode. */
+fun looksLikeLiveStream(url: String, kind: String): Boolean {
+    if (kind != Kind.LIVE) return false
+    val path = url.substringBefore('?').lowercase()
+    return "/live/" in path || path.endsWith(".ts")
+}
+
+/** How long to wait before reconnecting a live stream that stopped: 1, 2, 4, 8 seconds, then 8 seconds each time. */
+object Recovery {
+    fun delayMs(attempt: Int): Long = minOf(1000L shl (attempt - 1).coerceIn(0, 4), 8000L)
+}
+
 /** Guesses the format from the link; Auto lets ExoPlayer decide from the file extension. */
 fun detectFormat(url: String): StreamFormat {
     val u = url.lowercase()

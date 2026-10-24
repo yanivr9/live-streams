@@ -152,6 +152,7 @@ class PlayerActivity : ComponentActivity() {
     private var reachedReady = false
     private var droppedFrames = 0
     private var pausedByStop = false
+    private var closedInBackground = false   // a live stream was closed (not just paused) when the app left the screen
 
     // Compose state
     private var current by mutableStateOf<Channel?>(null)
@@ -239,8 +240,14 @@ class PlayerActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var seconds = 0
+                var bufferingFor = 0
                 while (true) {
                     updateStats()
+                    bufferingFor = if (player.playbackState == Player.STATE_BUFFERING && castTarget == null) bufferingFor + 1 else 0
+                    if (bufferingFor >= STALL_SECONDS && reachedReady && liveLike()) {
+                        bufferingFor = 0
+                        reconnectLive("frozen for $STALL_SECONDS s")
+                    }
                     // A line every 30 s: if the picture goes black, the log shows whether playback was still running
                     if (++seconds % 30 == 0) {
                         AppLog.i("player", "  alive ${seconds}s: ${stateName(player.playbackState)}, playing=${player.isPlaying}, buffer ${stats.buffer}, dropped ${stats.dropped}")
@@ -285,7 +292,8 @@ class PlayerActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         if (pausedByStop) AppLog.i("player", "  app is back on screen; resuming")
-        if (pausedByStop) player.play()
+        if (pausedByStop && closedInBackground) load() else if (pausedByStop) player.play()
+        closedInBackground = false
         pausedByStop = false
     }
 
@@ -294,8 +302,16 @@ class PlayerActivity : ComponentActivity() {
         AppLog.i("player", "  app left the screen (playing=${player.isPlaying}, picture-in-picture=$isInPictureInPictureMode)")
         // Keep playing in picture-in-picture; pause when the app really goes to the background
         if (!isInPictureInPictureMode && player.isPlaying) {
-            AppLog.i("player", "  pausing because the app is in the background")
-            player.pause()
+            if (liveLike() && castTarget == null) {
+                // A paused live stream still holds its connection, and so uses up one of the account's screens
+                AppLog.i("player", "  closing the live stream because the app is in the background")
+                handler.removeCallbacksAndMessages(null)
+                player.stop()
+                closedInBackground = true
+            } else {
+                AppLog.i("player", "  pausing because the app is in the background")
+                player.pause()
+            }
             pausedByStop = true
         }
     }
@@ -430,7 +446,9 @@ class PlayerActivity : ComponentActivity() {
                 LinkPrefs.save(this@PlayerActivity, tv.host, code)
                 castTarget = tv
                 castCode = code
-                player.pause()
+                // Stop, don't pause: a paused stream keeps its connection to the provider, which counts as a second screen
+                handler.removeCallbacksAndMessages(null)
+                player.stop()
             }.onFailure { Toast.makeText(this@PlayerActivity, it.message ?: "Couldn't reach the TV.", Toast.LENGTH_LONG).show() }
         }
     }
@@ -494,10 +512,10 @@ class PlayerActivity : ComponentActivity() {
                     retries = 0
                     reachedReady = true
                 }
-                Player.STATE_ENDED -> if (!player.isCurrentMediaItemLive) status = Status("Finished playing.")
+                Player.STATE_ENDED -> if (liveLike()) reconnectLive("the stream ended") else status = Status("Finished playing.")
                 else -> Unit
             }
-            isLive = player.isCurrentMediaItemLive
+            isLive = liveLike()
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -543,19 +561,38 @@ class PlayerActivity : ComponentActivity() {
             return
         }
 
-        // A stream that was playing dropped: reconnect with backoff (1, 2, 4, 8, 16 s)
+        // A stream that was playing dropped: reconnect with backoff. Live TV gets many more tries than a movie.
+        val live = liveLike()
+        if (reachedReady && live && (code in NETWORK_ERRORS || code in PARSING_ERRORS)) {
+            reconnectLive(e.errorCodeName)
+            return
+        }
         if (reachedReady && code in NETWORK_ERRORS && retries < MAX_RETRIES) {
             retries++
             AppLog.i("player", "  connection lost; reconnecting ($retries of $MAX_RETRIES)")
             status = Status("Connection lost. Reconnecting ($retries of $MAX_RETRIES)…")
-            handler.postDelayed({
-                if (player.isCurrentMediaItemLive) player.seekToDefaultPosition()
-                player.prepare()
-            }, 1000L shl (retries - 1))
+            handler.postDelayed({ player.prepare() }, Recovery.delayMs(retries))
             return
         }
 
         status = Status(explain(e), isError = true)
+    }
+
+    /** Is this a live stream (as opposed to a movie)? Providers' .ts streams don't announce that themselves. */
+    private fun liveLike(): Boolean =
+        player.isCurrentMediaItemLive || queue.getOrNull(index)?.let { looksLikeLiveStream(it.url, it.kind) } == true
+
+    /** A live stream stopped (the provider closed it, the network blinked, or it froze): open it again, with growing pauses. */
+    private fun reconnectLive(reason: String) {
+        if (retries >= LIVE_MAX_RETRIES) {
+            AppLog.e("player", "  gave up after $LIVE_MAX_RETRIES reconnects ($reason)")
+            status = Status("The stream keeps stopping. Press OK or tap Try again, or check the internet connection.", isError = true)
+            return
+        }
+        retries++
+        AppLog.i("player", "  $reason; reconnecting ($retries of $LIVE_MAX_RETRIES)")
+        status = Status("Connection lost. Reconnecting…")
+        handler.postDelayed({ load() }, Recovery.delayMs(retries))
     }
 
     private fun explain(e: PlaybackException): String {
@@ -602,7 +639,7 @@ class PlayerActivity : ComponentActivity() {
             dropped = droppedFrames.toString(),
             latency = if (player.isCurrentMediaItemLive && liveOffset != C.TIME_UNSET) "%.1f s".format(liveOffset / 1000.0) else "–",
         )
-        isLive = player.isCurrentMediaItemLive
+        isLive = liveLike()
     }
 
     // ---------- window ----------
@@ -989,6 +1026,8 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_INDEX = "index"
         private const val EXTRA_FORMAT = "format"
         private const val MAX_RETRIES = 5
+        private const val LIVE_MAX_RETRIES = 12
+        private const val STALL_SECONDS = 25
 
         private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)
         private val UNSUPPORTED_SCHEMES = setOf("udp", "rtp", "srt", "mms", "rtmps")
