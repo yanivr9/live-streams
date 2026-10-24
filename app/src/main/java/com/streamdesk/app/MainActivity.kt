@@ -59,6 +59,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -172,6 +176,7 @@ private sealed interface HomeDialog {
     data object Logs : HomeDialog
     data object EditSport : HomeDialog
     data object LinkPhone : HomeDialog
+    data object Search : HomeDialog
     data class PickTv(val job: TvJob) : HomeDialog
 }
 
@@ -388,17 +393,7 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).background(OnAir, CircleShape))
-                        Spacer(Modifier.width(12.dp))
-                        Text("Stream Desk", fontWeight = FontWeight.SemiBold)
-                    }
-                },
-                actions = {
+    val topActions: @Composable RowScope.() -> Unit = {
                     if (LocalIsTv.current) {
                         IconButton(onClick = { dialog = HomeDialog.LinkPhone }) {
                             Icon(Icons.Default.Cast, contentDescription = "Link a phone")
@@ -464,12 +459,45 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                             })
                         }
                     }
+    }
+
+    Scaffold(
+        topBar = {
+            if (!isTv) TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).background(OnAir, CircleShape))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Stream Desk", fontWeight = FontWeight.SemiBold)
+                    }
                 },
+                actions = topActions,
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            if (isTv) {
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).background(OnAir, CircleShape))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Stream Desk", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.width(14.dp))
+                    ScrollableTabRow(
+                        selectedTabIndex = section.ordinal,
+                        modifier = Modifier.weight(1f),
+                        containerColor = Color.Transparent,
+                        edgePadding = 0.dp,
+                        divider = {},
+                    ) {
+                        Section.entries.forEach { s ->
+                            Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
+                        }
+                    }
+                    IconButton(onClick = { dialog = HomeDialog.Search }) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
+                    topActions()
+                }
+            }
             if (isTv && sources.isEmpty()) {
                 LinkPhoneCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
@@ -501,14 +529,16 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                 FormatPicker(format, onPick = { format = it }, modifier = Modifier.padding(horizontal = 8.dp))
             }
 
-            // Scrolls when the labels don't fit, e.g. with large text sizes
-            ScrollableTabRow(
-                selectedTabIndex = section.ordinal,
-                containerColor = MaterialTheme.colorScheme.background,
-                edgePadding = 8.dp,
-            ) {
-                Section.entries.forEach { s ->
-                    Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
+            if (!isTv) {
+    // Scrolls when the labels don't fit, e.g. with large text sizes
+                ScrollableTabRow(
+                    selectedTabIndex = section.ordinal,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    edgePadding = 8.dp,
+                ) {
+                    Section.entries.forEach { s ->
+                        Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
+                    }
                 }
             }
 
@@ -536,18 +566,20 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                 return@Column
             }
 
+            if (!isTv) {
             OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
-                singleLine = true,
-                placeholder = { Text("Search channels") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = if (query.isNotEmpty()) {
-                    { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, contentDescription = "Clear search") } }
-                } else null,
-            )
-            if (kindsPresent.size > 1) {
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                    singleLine = true,
+                    placeholder = { Text("Search channels") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = if (query.isNotEmpty()) {
+                        { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, contentDescription = "Clear search") } }
+                    } else null,
+                )
+            }
+            if (!isTv && kindsPresent.size > 1) {
                 LazyRow(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -562,11 +594,19 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
                 }
             }
             val showSourceChip = section == Section.All && filterName != null
-            if (groups.isNotEmpty() || showSourceChip) {
+            if (groups.isNotEmpty() || showSourceChip || (isTv && query.isNotBlank())) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (isTv && query.isNotBlank()) item {
+                        FilterChip(
+                            selected = true,
+                            onClick = { query = "" },
+                            label = { Text("Search: $query", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp)) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(16.dp)) },
+                        )
+                    }
                     if (showSourceChip) item {
                         FilterChip(
                             selected = true,
@@ -586,6 +626,33 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
 
             if (visible.isEmpty()) {
                 EmptyState(section, filtered = query.isNotBlank() || group != null)
+            } else if (isTv) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(190.dp),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                        ChannelTile(
+                            modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
+                            channel = ch,
+                            number = if (section == Section.Sport) i + 1 else numbers[ch.url],
+                            saved = numbers[ch.url] != null,
+                            onClick = {
+                                if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
+                                else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
+                            },
+                            onToggleFavorite = { store.toggleFavorite(ch) },
+                            onRename = { dialog = HomeDialog.Rename(ch) },
+                            onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
+                            onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
+                            onRemove = { if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url) },
+                            removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
+                        )
+                    }
+                }
             } else {
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
@@ -692,6 +759,13 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
         )
         HomeDialog.LinkPhone -> LinkPhoneDialog(onDismiss = { dialog = null })
+        HomeDialog.Search -> TextDialog(
+            title = "Search channels",
+            initial = query,
+            confirm = "Search",
+            onDismiss = { dialog = null },
+            onConfirm = { query = it.trim(); dialog = null },
+        )
         is HomeDialog.PickTv -> TvPickerDialog(
             title = if (d.job is TvJob.Login) "Send login to TV" else "Play on TV",
             onDismiss = { dialog = null },
