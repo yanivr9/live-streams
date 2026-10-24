@@ -317,6 +317,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (isTv) NowPlaying.clear()
         handler.removeCallbacksAndMessages(null)
         bannerHandler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(screenReceiver) }
@@ -362,6 +363,7 @@ class PlayerActivity : ComponentActivity() {
     private fun play(i: Int) {
         index = i
         val ch = queue[i]
+        if (isTv) NowPlaying.set(queue, i)
         current = ch
         retries = 0
         clientAttempt = 0
@@ -436,6 +438,21 @@ class PlayerActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching { withContext(Dispatchers.IO) { LinkClient.command(tv, castCode, action) } }
                 .onFailure { Toast.makeText(this@PlayerActivity, it.message ?: "Couldn't reach the TV.", Toast.LENGTH_LONG).show() }
+        }
+    }
+
+    /** "Play here": the TV stops and says which channel it was on (it may have changed with its own remote). */
+    private fun takeBack(tv: TvDevice) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { LinkClient.takeOver(tv, castCode) } }
+            castTarget = null
+            result.onSuccess { (q, i) ->
+                queue = q
+                play(i)
+            }.onFailure {
+                sendToTv(tv, "stop")
+                play(index)
+            }
         }
     }
 
@@ -811,11 +828,7 @@ class PlayerActivity : ComponentActivity() {
                     sendToTv(tv, "stop")
                     castTarget = null
                 }) { Text("Stop the TV") }
-                Button(onClick = {
-                    sendToTv(tv, "stop")
-                    castTarget = null
-                    play(index)
-                }) { Text("Play here") }
+                Button(onClick = { takeBack(tv) }) { Text("Play here") }
             }
             Text(
                 "Back leaves the TV playing.",

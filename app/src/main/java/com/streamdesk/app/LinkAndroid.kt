@@ -16,6 +16,14 @@ import java.net.NetworkInterface
 import java.security.SecureRandom
 
 /** Remote-control commands that reached the TV ("next", "prev", "stop"), for the open player to act on. */
+/** TV: what the player is showing right now, for "Continue on phone". */
+object NowPlaying {
+    @Volatile var queue: List<Channel> = emptyList()
+    @Volatile var index = 0
+    fun set(queue: List<Channel>, index: Int) { this.queue = queue; this.index = index }
+    fun clear() { queue = emptyList() }
+}
+
 object LinkBus {
     private val _commands = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val commands: SharedFlow<String> = _commands
@@ -97,6 +105,14 @@ object LinkReceiver {
         override fun command(action: String) {
             AppLog.i("link", "A phone sent: $action")
             LinkBus.send(action)
+        }
+
+        override fun takeOver(): Pair<List<Channel>, Int>? {
+            val queue = NowPlaying.queue
+            if (queue.isEmpty()) return null
+            AppLog.i("link", "A phone took over the channel; stopping here")
+            LinkBus.send("stop")   // stop, so only one screen uses the account
+            return queue to NowPlaying.index.coerceIn(queue.indices)
         }
 
         override fun login(request: LoginRequest) {

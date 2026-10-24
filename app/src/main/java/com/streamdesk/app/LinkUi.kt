@@ -54,6 +54,8 @@ import kotlinx.coroutines.withContext
 sealed interface TvJob {
     data class Play(val queue: List<Channel>, val index: Int) : TvJob
     data class Login(val source: PlaylistSource) : TvJob
+    /** Continue on this phone with what the TV is playing. */
+    data object TakeOver : TvJob
 }
 
 /** Phone: choose a TV on the Wi-Fi (or type its address), then enter the code shown on it. */

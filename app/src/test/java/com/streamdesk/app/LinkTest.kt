@@ -16,6 +16,8 @@ class LinkTest {
         override fun play(queue: List<Channel>, index: Int) { played = queue to index }
         override fun command(action: String) { commands += action }
         override fun login(request: LoginRequest) { login = request }
+        var nowPlaying: Pair<List<Channel>, Int>? = null
+        override fun takeOver() = nowPlaying?.also { commands += "stop" }
     }
 
     private val recorder = Recorder()
@@ -34,6 +36,16 @@ class LinkTest {
 
     private fun failsWith(kind: LinkException.Kind, block: () -> Unit) {
         try { block(); fail("expected a LinkException") } catch (e: LinkException) { assertEquals(kind, e.kind) }
+    }
+
+    @Test
+    fun phoneTakesOverWhatTheTvPlays() {
+        failsWith(LinkException.Kind.Other) { LinkClient.takeOver(tv, "123456") }   // nothing playing
+        val list = listOf(Channel("http://x/1", "One"), Channel("http://x/2", "Two"))
+        recorder.nowPlaying = list to 1
+        assertEquals(list to 1, LinkClient.takeOver(tv, "123456"))
+        assertEquals(listOf("stop"), recorder.commands)
+        failsWith(LinkException.Kind.WrongCode) { LinkClient.takeOver(tv, "000000") }
     }
 
     @Test

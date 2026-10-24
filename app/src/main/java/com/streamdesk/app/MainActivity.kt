@@ -312,10 +312,19 @@ private fun HomeScreen(
     }
 
     fun runTvJob(job: TvJob, device: TvDevice, code: String) {
+        if (job is TvJob.TakeOver) {
+            scope.launch {
+                withContext(Dispatchers.IO) { runCatching { LinkClient.takeOver(device, code) } }
+                    .onSuccess { (queue, index) -> LinkPrefs.save(context, device.host, code); onPlay(queue, index, StreamFormat.Auto) }
+                    .onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+            }
+            return
+        }
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     when (job) {
+                        TvJob.TakeOver -> Unit
                         is TvJob.Play -> LinkClient.play(device, code, job.queue, job.index)
                         is TvJob.Login -> LinkClient.sendLogin(
                             device, code,
@@ -508,6 +517,11 @@ private fun HomeScreen(
                             if (LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Link a phone") }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.LinkPhone
+                                })
+                            }
+                            if (!LocalIsTv.current) {
+                                AppMenuItem(text = { Text("Continue from TV") }, onClick = {
+                                    moreMenu = false; dialog = HomeDialog.PickTv(TvJob.TakeOver)
                                 })
                             }
                             AppMenuItem(text = { Text("Edit Sport list") }, onClick = {
@@ -857,7 +871,7 @@ private fun HomeScreen(
             onConfirm = { query = it.trim(); dialog = null },
         )
         is HomeDialog.PickTv -> TvPickerDialog(
-            title = if (d.job is TvJob.Login) "Send login to TV" else "Play on TV",
+            title = when (d.job) { is TvJob.Login -> "Send login to TV"; TvJob.TakeOver -> "Continue from TV"; else -> "Play on TV" },
             onDismiss = { dialog = null },
             onChosen = { device, code -> dialog = null; runTvJob(d.job, device, code) },
         )

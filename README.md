@@ -26,6 +26,8 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   codes are locked out. Scanning the QR code with the phone's camera opens a page on the TV with a button that starts
   Stream Desk on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
   send the login.
+- **Continue on phone**: ⋮ → Continue from TV on the phone (or Play here on the phone's remote screen) stops the TV and carries on
+  with the same channel on the phone, so only one screen uses the account at a time.
 - **Auto-reconnect**: a live stream that ends, errors or freezes for 25 s reconnects up to 12 times (1, 2, 4 and 8 s apart, then every 8 s).
 - **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
 - **Open on last channel** (TV): starting the app goes straight to the channel you watched last. ⋮ → Open on last channel turns it off.

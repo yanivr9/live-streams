@@ -40,6 +40,8 @@ interface LinkHandler {
     fun play(queue: List<Channel>, index: Int)
     fun command(action: String)
     fun login(request: LoginRequest)
+    /** "Continue on phone": what the TV is playing (channels and position), and stop playing it. Null if nothing plays. */
+    fun takeOver(): Pair<List<Channel>, Int>?
 }
 
 /** Why a call to the TV failed, in words the user can act on. */
@@ -128,7 +130,7 @@ class LinkServer(
         if (method == "GET" && path == "/ping") {
             return 200 to JSONObject().put("app", "streamdesk").put("name", deviceName).put("version", version)
         }
-        if (method != "POST" || path !in setOf("/play", "/command", "/login")) return 404 to error("not found")
+        if (method != "POST" || path !in setOf("/play", "/command", "/login", "/takeover")) return 404 to error("not found")
         authorize(given)?.let { return it }
         val json = runCatching { JSONObject(body) }.getOrNull() ?: return 400 to error("bad request")
         when (path) {
@@ -139,6 +141,10 @@ class LinkServer(
                 handler.play(queue, json.optInt("index").coerceIn(queue.indices))
             }
             "/command" -> handler.command(json.optString("action"))
+            "/takeover" -> {
+                val (queue, index) = handler.takeOver() ?: return 409 to error("nothing playing")
+                return 200 to JSONObject().put("index", index).put("queue", JSONArray().also { a -> queue.forEach { a.put(it.toJson()) } })
+            }
             "/login" -> {
                 val login = json.optJSONObject("login")?.let(XtreamLogin::fromJson) ?: return 400 to error("no login")
                 val sport = json.optJSONObject("sport")?.let {
@@ -257,6 +263,15 @@ object LinkClient {
         request("POST", device.host, device.port, "/command", code, JSONObject().put("action", action).toString())
     }
 
+    /** Stops the TV and returns what it was playing, so the phone can carry on with it. */
+    fun takeOver(device: TvDevice, code: String): Pair<List<Channel>, Int> {
+        val json = request("POST", device.host, device.port, "/takeover", code, "{}")
+        val arr = json.optJSONArray("queue") ?: throw LinkException(LinkException.Kind.Other, "The TV didn't say what it's playing.")
+        val queue = List(arr.length()) { Channel.fromJson(arr.getJSONObject(it)) }
+        if (queue.isEmpty()) throw LinkException(LinkException.Kind.Other, "The TV didn't say what it's playing.")
+        return queue to json.optInt("index").coerceIn(queue.indices)
+    }
+
     fun sendLogin(device: TvDevice, code: String, request: LoginRequest) {
         val body = JSONObject()
             .put("login", request.login.toJson())
@@ -291,6 +306,7 @@ object LinkClient {
             when (status) {
                 200 -> return runCatching { JSONObject(conn.inputStream.bufferedReader().readText()) }.getOrDefault(JSONObject())
                 403 -> throw LinkException(LinkException.Kind.WrongCode, "Wrong code. Check the code shown on the TV under ⋮ → Link a phone.")
+                409 -> throw LinkException(LinkException.Kind.Other, "Nothing is playing on the TV right now.")
                 429 -> throw LinkException(LinkException.Kind.TooManyTries, "Too many wrong codes. Wait a minute and try again.")
                 else -> throw LinkException(LinkException.Kind.Other, "The TV answered with an error (HTTP $status). Update Stream Desk on both devices.")
             }
