@@ -2,6 +2,12 @@ package com.streamdesk.app
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Arrangement
@@ -157,12 +163,31 @@ fun TvPickerDialog(title: String, onDismiss: () -> Unit, onChosen: (TvDevice, St
     )
 }
 
-/** TV: on the first screen, until a playlist is loaded: how to connect the phone, with the code in plain sight. */
+/** A QR code, drawn crisp and black on white (with the blank border scanners need). */
+@Composable
+fun QrCode(text: String, size: Dp, modifier: Modifier = Modifier) {
+    val matrix = remember(text) { runCatching { Qr.matrix(text) }.getOrNull() } ?: return
+    Canvas(modifier.size(size).background(Color.White)) {
+        val quiet = 4
+        val module = this.size.minDimension / (matrix.width + 2 * quiet)
+        for (y in 0 until matrix.height) for (x in 0 until matrix.width) {
+            if (matrix.get(x, y)) {
+                drawRect(Color.Black, topLeft = Offset((x + quiet) * module, (y + quiet) * module), size = Size(module + 0.5f, module + 0.5f))
+            }
+        }
+    }
+}
+
+/** The address the QR code points to: a page on the TV that opens Stream Desk on the phone. */
+private fun connectUrl(code: String): String? =
+    LinkReceiver.address()?.let { "http://$it:${LinkReceiver.port}/connect?c=$code" }
+
+/** TV: on the first screen, until a playlist is loaded: how to connect the phone, with the QR code and the code in plain sight. */
 @Composable
 fun LinkPhoneCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val code = remember { LinkReceiver.code(context) }
-    val address = remember { LinkReceiver.address() }
+    val url = remember { connectUrl(code) }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -173,42 +198,73 @@ fun LinkPhoneCard(modifier: Modifier = Modifier) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Connect your phone, so you don't type with the remote", fontWeight = FontWeight.Bold)
                 Text(
-                    "On your phone: Stream Desk → Playlists → ⋮ next to your account → Send login to TV. Choose this TV and type the code." +
-                        (if (address != null) "  If it isn't listed, use the address $address." else ""),
+                    if (url != null) "Scan the QR code with your phone's camera, tap Open Stream Desk, then send your login. Or type the code in the app: Playlists → ⋮ next to your account → Send login to TV."
+                    else "On your phone: Stream Desk → Playlists → ⋮ next to your account → Send login to TV. Choose this TV and type the code.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("CODE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(code.chunked(3).joinToString(" "), fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
+                Text(code.chunked(3).joinToString(" "), fontSize = 26.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
             }
+            if (url != null) QrCode(url, 150.dp)
         }
     }
 }
 
-/** TV: shows the code and address a phone needs. */
+/** TV: shows the QR code (large), the code and the address a phone needs. */
 @Composable
 fun LinkPhoneDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     var code by remember { mutableStateOf(LinkReceiver.code(context)) }
     val address = remember { LinkReceiver.address() }
+    val url = connectUrl(code)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Link a phone") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("On your phone: open Stream Desk → Playlists → ⋮ next to your account → Send login to TV (or ⋮ on a channel → Play on TV). Choose this TV and type this code.")
-                Text(code.chunked(3).joinToString(" "), fontSize = 40.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
-                Text(
-                    if (address != null) "If the phone can't find the TV, type this address: $address"
-                    else "This TV isn't connected to a network.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text("Keep Stream Desk open on the TV while you send to it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (url != null) QrCode(url, 230.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        if (url != null) "Scan the QR code with your phone's camera, then tap Open Stream Desk."
+                        else "On your phone: Stream Desk → Playlists → ⋮ next to your account → Send login to TV (or ⋮ on a channel → Play on TV). Choose this TV and type this code.",
+                    )
+                    Text("Or type this code in the app:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(code.chunked(3).joinToString(" "), fontSize = 36.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
+                    Text(
+                        if (address != null) "If the phone can't find the TV, type this address: $address" else "This TV isn't connected to a network.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text("Keep Stream Desk open on the TV while you send to it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         dismissButton = { TextButton(onClick = { code = LinkReceiver.newCode(context) }) { Text("New code") } },
+    )
+}
+
+/** Phone: the QR code was scanned. Asks before anything is sent anywhere. */
+@Composable
+fun InviteDialog(invite: LinkInvite, canSendLogin: Boolean, onSendLogin: () -> Unit, onConnectOnly: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Connect to your TV?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("${invite.name}\n${invite.host}", fontWeight = FontWeight.SemiBold)
+                Text("This phone will be able to send channels to that TV and use itself as its remote.")
+                if (canSendLogin) Text("Send your login to it too, so you don't type it on the TV?", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Only continue if the address is your own TV's. Back to cancel.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = if (canSendLogin) onSendLogin else onConnectOnly) { Text(if (canSendLogin) "Send my login" else "Connect") }
+        },
+        dismissButton = {
+            TextButton(onClick = if (canSendLogin) onConnectOnly else onDismiss) { Text(if (canSendLogin) "Just connect" else "Cancel") }
+        },
     )
 }

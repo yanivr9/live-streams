@@ -28,6 +28,9 @@ object LinkReceiver {
     private var nsd: NsdManager? = null
     private var registration: NsdManager.RegistrationListener? = null
 
+    /** The port the TV is really listening on (the usual one, unless it was taken). */
+    @Volatile var port: Int = LINK_PORT
+
     /** The pairing code shown on the TV. Created once; "New code" replaces it. */
     fun code(context: Context): String {
         val prefs = context.applicationContext.getSharedPreferences("link", Context.MODE_PRIVATE)
@@ -58,6 +61,7 @@ object LinkReceiver {
             return
         }
         server = s
+        this.port = port
         AppLog.i("link", "Listening for a phone on ${address() ?: "?"}:$port")
         runCatching {
             val manager = app.getSystemService(Context.NSD_SERVICE) as NsdManager

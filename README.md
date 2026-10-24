@@ -22,7 +22,10 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   Switches on automatically on a TV; phones are unchanged.
 - **Play on TV**: from the phone, send a channel (and its list) to Stream Desk on a TV box over the home Wi-Fi, then use the
   phone as a remote (CH +/−, stop). Also sends the IPTV login and Sport list to the TV, so nothing is typed with the remote.
-  The TV announces itself on the network and shows a 6-digit pairing code (⋮ → Link a phone); wrong codes are locked out.
+  The TV announces itself on the network and shows a QR code and a 6-digit pairing code (cast icon → Link a phone); wrong
+  codes are locked out. Scanning the QR code with the phone's camera opens a page on the TV with a button that starts
+  Stream Desk on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
+  send the login.
 - **Auto-reconnect**: a live stream that drops reconnects up to 5 times (after 1, 2, 4, 8 and 16 s).
 - Opens stream links shared from other apps or tapped in a browser, and `.m3u` files from a file manager.
 

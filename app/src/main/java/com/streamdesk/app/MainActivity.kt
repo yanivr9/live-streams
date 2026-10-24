@@ -125,6 +125,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -132,7 +134,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) importFromIntent(intent)
         val crash = App.takeCrashReport(this)
         setContent {
-            StreamDeskTheme(isTv = isTelevision()) { HomeScreen(store, ::openPlayer, crash) }
+            StreamDeskTheme(isTv = isTelevision()) { HomeScreen(store, ::openPlayer, crash, invite) { invite = null } }
         }
     }
 
@@ -144,6 +146,12 @@ class MainActivity : ComponentActivity() {
     /** Handles a .m3u file opened from a file manager or browser download. */
     private fun importFromIntent(intent: Intent) {
         val uri = intent.data ?: return
+        if (uri.scheme == "streamdesk") {   // the link behind a TV's QR code
+            val parsed = LinkInvite.parse(uri.toString())
+            if (parsed != null) invite = parsed
+            else Toast.makeText(this, "That isn't a valid link to a TV on your home network.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (intent.action != Intent.ACTION_VIEW) return
         val text = runCatching { readText(this, uri) }.getOrNull()
         val msg = if (text == null) "Couldn't read that playlist file." else importText(ChannelStore.get(this), text)
@@ -177,6 +185,7 @@ private sealed interface HomeDialog {
     data object EditSport : HomeDialog
     data object LinkPhone : HomeDialog
     data object Search : HomeDialog
+    data class Invite(val invite: LinkInvite) : HomeDialog
     data class PickTv(val job: TvJob) : HomeDialog
 }
 
@@ -194,7 +203,13 @@ private const val DAY_MS = 24 * 60 * 60 * 1000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamFormat) -> Unit, crashReport: String? = null) {
+private fun HomeScreen(
+    store: ChannelStore,
+    onPlay: (List<Channel>, Int, StreamFormat) -> Unit,
+    crashReport: String? = null,
+    invite: LinkInvite? = null,
+    onInviteDone: () -> Unit = {},
+) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -305,6 +320,21 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
             }.onFailure { notify(it.message ?: "Couldn't reach the TV.") }
         }
     }
+
+    fun connectInvite(invite: LinkInvite, source: PlaylistSource?) {
+        val device = TvDevice(invite.name, invite.host, invite.port)
+        scope.launch {
+            // "hello" checks the code without doing anything on the TV
+            val check = withContext(Dispatchers.IO) { runCatching { LinkClient.command(device, invite.code, "hello") } }
+            check.onSuccess {
+                LinkPrefs.save(context, device.host, invite.code)
+                if (source != null) runTvJob(TvJob.Login(source), device, invite.code)
+                else notify("Connected to ${device.name}. Tap ⋮ on a channel, then Play on TV.")
+            }.onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+        }
+    }
+
+    LaunchedEffect(invite) { invite?.let { dialog = HomeDialog.Invite(it) } }
 
     fun playLink(link: String) = onPlay(listOf(store.find(link) ?: Channel(link, nameFromUrl(link))), 0, format)
 
@@ -759,6 +789,16 @@ private fun HomeScreen(store: ChannelStore, onPlay: (List<Channel>, Int, StreamF
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
         )
         HomeDialog.LinkPhone -> LinkPhoneDialog(onDismiss = { dialog = null })
+        is HomeDialog.Invite -> {
+            val source = sources.firstOrNull { it.xtream != null && it.enabled }
+            InviteDialog(
+                invite = d.invite,
+                canSendLogin = source != null,
+                onSendLogin = { dialog = null; onInviteDone(); connectInvite(d.invite, source) },
+                onConnectOnly = { dialog = null; onInviteDone(); connectInvite(d.invite, null) },
+                onDismiss = { dialog = null; onInviteDone() },
+            )
+        }
         HomeDialog.Search -> TextDialog(
             title = "Search channels",
             initial = query,

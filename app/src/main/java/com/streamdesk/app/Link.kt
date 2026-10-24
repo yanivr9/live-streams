@@ -10,6 +10,8 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
+import java.net.URLDecoder
+import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -103,6 +105,14 @@ class LinkServer(
                     if (line.isEmpty()) break
                     headers[line.substringBefore(':').trim().lowercase()] = line.substringAfter(':', "").trim()
                 }
+                // The QR code on the TV opens this page on the phone: a button that starts Stream Desk with the TV's details
+                val path = parts[1].substringBefore('?')
+                if (parts[0] == "GET" && path == "/connect") {
+                    val given = queryParam(parts[1], "c")
+                    authorize(given)?.let { return respond(c, it.first, it.second) }
+                    val host = (headers["host"] ?: c.localAddress.hostAddress.orEmpty()).substringBefore(':')
+                    return respondHtml(c, connectPage(host, c.localPort, given))
+                }
                 val length = headers["content-length"]?.toIntOrNull() ?: 0
                 if (length < 0 || length > MAX_BODY) return respond(c, 413, error("too big"))
                 val body = if (length > 0) String(readBytes(input, length), Charsets.UTF_8) else ""
@@ -156,6 +166,36 @@ class LinkServer(
     }
 
     private fun error(message: String) = JSONObject().put("error", message)
+
+    private fun queryParam(target: String, name: String): String =
+        target.substringAfter('?', "").split('&')
+            .firstOrNull { it.substringBefore('=') == name }?.substringAfter('=', "")
+            ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrDefault("") }.orEmpty()
+
+    private fun connectPage(host: String, port: Int, code: String): String {
+        val name = URLEncoder.encode(deviceName, "UTF-8")
+        val query = "host=$host&port=$port&code=$code&name=$name"
+        val intent = "intent://connect?$query#Intent;scheme=streamdesk;package=com.streamdesk.app;end"
+        val spaced = code.chunked(3).joinToString(" ")
+        return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stream Desk</title>
+<style>body{font-family:sans-serif;background:#0e1113;color:#e3e8ea;text-align:center;padding:32px 20px}h2{margin-bottom:8px}
+a.b{display:block;margin:28px auto;max-width:360px;padding:18px;border-radius:12px;background:#ff9f1c;color:#1a1205;font-weight:700;font-size:20px;text-decoration:none}
+.c{font:700 34px monospace;color:#ff9f1c;margin:10px 0}p{color:#c4cdd2;line-height:1.5}</style></head>
+<body><h2>Connect to ${htmlEscape(deviceName)}</h2><p>Tap the button to open Stream Desk on this phone.</p>
+<a class="b" href="$intent">Open Stream Desk</a>
+<p>If nothing happens, install Stream Desk on this phone, or open it and use Playlists, then the three dots, then Send login to TV, and type this code:</p>
+<div class="c">$spaced</div></body></html>"""
+    }
+
+    private fun htmlEscape(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+
+    private fun respondHtml(c: Socket, html: String) {
+        val bytes = html.toByteArray(Charsets.UTF_8)
+        val out = c.getOutputStream()
+        out.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+        out.write(bytes)
+        out.flush()
+    }
 
     private fun respond(c: Socket, status: Int, json: JSONObject) {
         val bytes = json.toString().toByteArray(Charsets.UTF_8)
@@ -258,4 +298,43 @@ object LinkClient {
             conn.disconnect()
         }
     }
+}
+
+/** What the phone learns by scanning the TV's QR code: where the TV is and its code. */
+data class LinkInvite(val host: String, val port: Int, val code: String, val name: String) {
+    companion object {
+        /** Reads streamdesk://connect?host=…&port=…&code=…&name=…; null if it isn't a valid invitation for a TV on a home network. */
+        fun parse(link: String): LinkInvite? {
+            val uri = runCatching { java.net.URI(link.trim()) }.getOrNull() ?: return null
+            if (uri.scheme != "streamdesk" || uri.host != "connect") return null
+            val q = uri.rawQuery?.split('&')?.associate {
+                it.substringBefore('=') to runCatching { URLDecoder.decode(it.substringAfter('=', ""), "UTF-8") }.getOrDefault("")
+            } ?: return null
+            val host = q["host"].orEmpty()
+            val port = q["port"]?.toIntOrNull() ?: LINK_PORT
+            val code = q["code"].orEmpty()
+            // A link must never point the phone at a server on the internet: only home-network addresses are accepted
+            if (!isHomeNetworkAddress(host) || port !in 1..65535 || code.length != 6 || !code.all(Char::isDigit)) return null
+            return LinkInvite(host, port, code, q["name"].orEmpty().ifBlank { "your TV" }.take(60))
+        }
+
+        fun isHomeNetworkAddress(host: String): Boolean {
+            val p = host.split('.')
+            if (p.size != 4) return false
+            val n = p.map { it.toIntOrNull() ?: return false }
+            if (n.any { it !in 0..255 }) return false
+            return n[0] == 10 || (n[0] == 172 && n[1] in 16..31) || (n[0] == 192 && n[1] == 168) || (n[0] == 169 && n[1] == 254) || n[0] == 127
+        }
+    }
+}
+
+/** QR codes, made with ZXing. */
+object Qr {
+    fun matrix(text: String): com.google.zxing.common.BitMatrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+        text, com.google.zxing.BarcodeFormat.QR_CODE, 0, 0,
+        mapOf(
+            com.google.zxing.EncodeHintType.MARGIN to 0,
+            com.google.zxing.EncodeHintType.ERROR_CORRECTION to com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M,
+        ),
+    )
 }
