@@ -172,6 +172,8 @@ class PlayerActivity : ComponentActivity() {
     private var banner by mutableStateOf<String?>(null)   // "12 · channel name", shown briefly after switching channel
     private val bannerHandler = Handler(Looper.getMainLooper())
     private val hideBanner = Runnable { banner = null }
+    private val typedNumber = NumberEntry()
+    private val goToTypedNumber = Runnable { commitTypedNumber() }
     private var hasQualities by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -320,6 +322,7 @@ class PlayerActivity : ComponentActivity() {
         if (isTv) NowPlaying.clear()
         handler.removeCallbacksAndMessages(null)
         bannerHandler.removeCallbacksAndMessages(null)
+        typedNumber.clear()
         runCatching { unregisterReceiver(screenReceiver) }
         if (::player.isInitialized) player.release()
         super.onDestroy()
@@ -470,6 +473,28 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    /** A number key on the remote: wait a moment for more digits (or OK), then go to that channel. */
+    private fun typeNumber(digit: Int) {
+        typedNumber.press(digit)
+        banner = "Channel ${typedNumber.text}_"
+        bannerHandler.removeCallbacks(hideBanner)
+        bannerHandler.removeCallbacks(goToTypedNumber)
+        bannerHandler.postDelayed(goToTypedNumber, 1500)
+    }
+
+    private fun commitTypedNumber() {
+        bannerHandler.removeCallbacks(goToTypedNumber)
+        val n = typedNumber.take() ?: return
+        if (n in 1..queue.size) {
+            if (n - 1 != index) play(n - 1)
+            showBanner()
+        } else {
+            banner = "No channel $n (1–${queue.size})"
+            bannerHandler.removeCallbacks(hideBanner)
+            bannerHandler.postDelayed(hideBanner, 2500)
+        }
+    }
+
     private fun showBanner() {
         banner = "${index + 1} / ${queue.size}  ·  ${queue[index].displayName()}"
         bannerHandler.removeCallbacks(hideBanner)
@@ -480,8 +505,20 @@ class PlayerActivity : ComponentActivity() {
     // Overriding here (not onKeyDown) catches the keys before any view does; lint's restriction is meant for library authors.
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isTv && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            AppLog.i("keys", "Remote key: ${KeyEvent.keyCodeToString(event.keyCode)}")   // to see which keys a TV's remote passes on
+        }
         if (isTv && !listOpen && event.action == KeyEvent.ACTION_DOWN) {
+            val digit = NumberKeys.digit(event.keyCode)
+            if (digit != null && queue.size > 1 && castTarget == null) {
+                if (event.repeatCount == 0) typeNumber(digit)
+                return true
+            }
             val action = TvKeys.map(event.keyCode)
+            if (action == TvAction.Select && typedNumber.text.isNotEmpty()) {
+                if (event.repeatCount == 0) commitTypedNumber()
+                return true
+            }
             if (action != null) {
                 if (event.repeatCount == 0) when (action) {
                     TvAction.ChannelUp -> zap(1)

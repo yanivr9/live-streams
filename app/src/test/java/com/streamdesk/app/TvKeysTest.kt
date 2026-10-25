@@ -24,6 +24,29 @@ class TvKeysTest {
     }
 
     @Test
+    fun fastForwardAndRewindAlsoChangeChannel() {
+        assertEquals(TvAction.ChannelUp, TvKeys.map(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
+        assertEquals(TvAction.ChannelDown, TvKeys.map(KeyEvent.KEYCODE_MEDIA_REWIND))
+    }
+
+    @Test
+    fun numberKeysTypeAChannelNumber() {
+        assertEquals(0, NumberKeys.digit(KeyEvent.KEYCODE_0))
+        assertEquals(7, NumberKeys.digit(KeyEvent.KEYCODE_7))
+        assertEquals(9, NumberKeys.digit(KeyEvent.KEYCODE_NUMPAD_9))
+        assertNull(NumberKeys.digit(KeyEvent.KEYCODE_A))
+        assertNull(NumberKeys.digit(KeyEvent.KEYCODE_DPAD_UP))
+        val typed = NumberEntry()
+        typed.press(1); typed.press(2)
+        assertEquals("12", typed.text)
+        assertEquals(12, typed.take())
+        assertEquals("", typed.text)
+        assertNull(typed.take())
+        typed.press(1); typed.press(2); typed.press(3); typed.press(4)   // a fourth digit starts over
+        assertEquals("4", typed.text)
+    }
+
+    @Test
     fun backVolumeAndHomeAreLeftToAndroid() {
         for (key in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME, KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE, KeyEvent.KEYCODE_A))
             assertNull(TvKeys.map(key))

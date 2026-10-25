@@ -55,13 +55,37 @@ enum class TvAction { ChannelUp, ChannelDown, Select, Menu, ShowInfo }
 
 object TvKeys {
     fun map(keyCode: Int): TvAction? = when (keyCode) {
-        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_MEDIA_NEXT -> TvAction.ChannelUp
-        KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> TvAction.ChannelDown
+        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> TvAction.ChannelUp
+        KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> TvAction.ChannelDown
         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> TvAction.Select
         KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> TvAction.Menu
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_INFO -> TvAction.ShowInfo
         else -> null
     }
+}
+
+/** The number keys: type 3 to go to channel 3, 1 then 2 for channel 12. */
+object NumberKeys {
+    fun digit(keyCode: Int): Int? = when (keyCode) {
+        in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
+        in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> keyCode - KeyEvent.KEYCODE_NUMPAD_0
+        else -> null
+    }
+}
+
+/** The digits typed so far. A fourth digit starts a new number. */
+class NumberEntry(private val maxDigits: Int = 3) {
+    var text = ""
+        private set
+
+    fun press(digit: Int) {
+        text = if (text.length >= maxDigits) digit.toString() else text + digit
+    }
+
+    /** The number typed, and clears it. */
+    fun take(): Int? = text.toIntOrNull().also { text = "" }
+
+    fun clear() { text = "" }
 }
 
 /** The selected row on a TV is solid white, so its text and icons turn near-black. */

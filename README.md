@@ -20,6 +20,8 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 - **TV mode** (Android TV / Google TV boxes such as the Xiaomi Mi Box): appears on the TV home screen, larger UI, a
   highlight that follows the remote, ▲/▼ to change channel, OK for the channel list, Menu for quality or stream info.
   Switches on automatically on a TV; phones are unchanged.
+  Number keys type a channel number (3, or 1 then 2 for 12; OK goes at once). Fast-forward and rewind also change channel.
+  The Logs screen lists each remote key the app receives ("Remote key: …"), to see what a TV's remote passes on over HDMI.
 - **Play on TV**: from the phone, send a channel (and its list) to Stream Desk on a TV box over the home Wi-Fi, then use the
   phone as a remote (CH +/−, stop). Also sends the IPTV login and Sport list to the TV, so nothing is typed with the remote.
   The TV announces itself on the network and shows a QR code and a 6-digit pairing code (cast icon → Link a phone); wrong
