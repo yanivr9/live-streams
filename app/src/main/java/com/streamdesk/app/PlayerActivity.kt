@@ -149,6 +149,7 @@ class PlayerActivity : ComponentActivity() {
     private var tryingFormat = StreamFormat.Auto
     private var retries = 0
     private var busyRetries = 0
+    private var streamOpen = false   // a stream is open (or opening) with the provider
     private var clientAttempt = 0   // index into CLIENT_USER_AGENTS for channels without their own
     private var reachedReady = false
     private var droppedFrames = 0
@@ -381,7 +382,18 @@ class PlayerActivity : ComponentActivity() {
         tryingFormat = if (requestedFormat != StreamFormat.Auto) requestedFormat else detectedFormat
         store.markPlayed(ch)
         AppLog.i("player", "Open \"${ch.name}\": ${ch.url}")
-        load()
+        // Switching channel: close the old stream first, and give the provider a moment to count it as closed.
+        // A one-screen account otherwise sees two streams at once and refuses the new one (HTTP 458).
+        // Pressing CH+ several times quickly only opens the channel you stop on.
+        handler.removeCallbacksAndMessages(null)
+        if (streamOpen) {
+            player.stop()
+            streamOpen = false
+            status = Status("Switching…")
+            handler.postDelayed({ load() }, SWITCH_GAP_MS)
+        } else {
+            load()
+        }
     }
 
     private fun load() {
@@ -397,6 +409,7 @@ class PlayerActivity : ComponentActivity() {
         http.setDefaultRequestProperties(if (ch.referrer.isBlank()) emptyMap() else mapOf("Referer" to ch.referrer))
 
         status = Status("Connecting…")
+        streamOpen = true
         AppLog.i("player", "  loading as ${tryingFormat.label} with ${agentName(ch.userAgent.ifBlank { CLIENT_USER_AGENTS[clientAttempt] })}")
         player.setMediaSource(buildSource(ch, tryingFormat))
         player.prepare()
@@ -622,7 +635,8 @@ class PlayerActivity : ComponentActivity() {
             busyRetries++
             AppLog.i("player", "  account busy (HTTP $httpCode); trying again ($busyRetries of $BUSY_MAX_RETRIES)")
             status = Status("Your account is in use on another screen. Trying again ($busyRetries of $BUSY_MAX_RETRIES)…")
-            handler.postDelayed({ load() }, BUSY_RETRY_MS)
+            player.stop()
+            handler.postDelayed({ load() }, if (busyRetries == 1) SWITCH_GAP_MS * 2 else BUSY_RETRY_MS)
             return
         }
 
@@ -1091,6 +1105,7 @@ class PlayerActivity : ComponentActivity() {
         private val ACCOUNT_BUSY_CODES = setOf(458, 429)   // providers answer this when the account's screen limit is reached
         private const val BUSY_MAX_RETRIES = 4
         private const val BUSY_RETRY_MS = 4_000L
+        private const val SWITCH_GAP_MS = 1_200L
         private const val STALL_SECONDS = 25
 
         private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)
