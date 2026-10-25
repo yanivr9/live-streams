@@ -46,6 +46,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -370,7 +372,7 @@ private fun HomeScreen(
         if (found != null && dialog == null) dialog = HomeDialog.Update(found)
     }
     var openLast by remember { mutableStateOf(Resume.enabled(context)) }
-    var tileSize by remember { mutableStateOf(TileSize.load(context)) }
+    var tileCount by remember { mutableStateOf(TileCount.load(context)) }
 
     fun playLink(link: String) = onPlay(listOf(store.find(link) ?: Channel(link, nameFromUrl(link))), 0, format)
 
@@ -549,8 +551,8 @@ private fun HomeScreen(
                                 })
                             }
                             if (LocalIsTv.current) {
-                                AppMenuItem(text = { Text("Tile size: ${tileSize.label}") }, onClick = {
-                                    moreMenu = false; tileSize = tileSize.next(); TileSize.save(context, tileSize)
+                                AppMenuItem(text = { Text("Channels on screen: ${tileCount.label}") }, onClick = {
+                                    moreMenu = false; tileCount = tileCount.next(); TileCount.save(context, tileCount)
                                 })
                             }
                             AppMenuItem(text = { Text("Check for updates") }, onClick = {
@@ -750,16 +752,20 @@ private fun HomeScreen(
             if (visible.isEmpty()) {
                 EmptyState(section, filtered = query.isNotBlank() || group != null)
             } else if (isTv) {
+                // The tiles are sized so exactly [tileCount] fit on the screen: the rows share the height
+                BoxWithConstraints(Modifier.weight(1f)) {
+                    val gap = 12.dp
+                    val rowHeight = ((maxHeight - 8.dp - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(110.dp)
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(tileSize.minWidth.dp),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    columns = GridCells.Fixed(tileCount.columns),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
                         ChannelTile(
-                            modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
+                            modifier = (if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier).height(rowHeight),
                             channel = ch,
                             number = if (section == Section.Sport) i + 1 else numbers[ch.url],
                             saved = numbers[ch.url] != null,
@@ -775,9 +781,10 @@ private fun HomeScreen(
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
                             nowOn = guide[ch.url],
                             onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
-                            scale = tileSize.scale,
+                            fillHeight = true,
                         )
                     }
+                }
                 }
             } else {
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {

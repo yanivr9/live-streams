@@ -41,17 +41,19 @@ import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.delay
 
-/** How big the channel tiles are on the TV: more small ones on the screen, or fewer large ones. */
-enum class TileSize(val label: String, val minWidth: Int, val scale: Float) {
-    Small("Small", 150, 0.8f), Medium("Medium", 190, 1f), Large("Large", 250, 1.3f);
+/** How many channel tiles fit on the first TV screen: the columns and rows are chosen so they fill it. */
+enum class TileCount(val count: Int, val columns: Int, val rows: Int) {
+    Six(6, 3, 2), Nine(9, 3, 3), Twelve(12, 4, 3), Fifteen(15, 5, 3);
+
+    val label: String get() = "$count"
 
     fun next() = entries[(ordinal + 1) % entries.size]
 
     companion object {
         private fun prefs(context: Context) = context.getSharedPreferences("launch", Context.MODE_PRIVATE)
-        fun load(context: Context): TileSize =
-            entries.firstOrNull { it.name == prefs(context).getString("tile_size", null) } ?: Medium
-        fun save(context: Context, size: TileSize) = prefs(context).edit().putString("tile_size", size.name).apply()
+        fun load(context: Context): TileCount =
+            entries.firstOrNull { it.name == prefs(context).getString("tile_count", null) } ?: Nine
+        fun save(context: Context, size: TileCount) = prefs(context).edit().putString("tile_count", size.name).apply()
     }
 }
 
@@ -74,7 +76,7 @@ fun ChannelTile(
     modifier: Modifier = Modifier,
     nowOn: String? = null,
     onGuide: (() -> Unit)? = null,
-    scale: Float = 1f,
+    fillHeight: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -107,9 +109,9 @@ fun ChannelTile(
             .clickable { if (heldOpen) heldOpen = false else onClick() }
             .padding(10.dp),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(if (fillHeight) Modifier.fillMaxSize() else Modifier, horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                Modifier.fillMaxWidth().height((84 * scale).dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                (if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(84.dp)).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
                 val numberText: @Composable () -> Unit = {
