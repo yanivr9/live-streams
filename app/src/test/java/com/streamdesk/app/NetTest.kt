@@ -77,4 +77,10 @@ class NetTest {
             assertEquals(404, e.code)
         }
     }
+
+    @Test
+    fun explainsAnAccountInUseOnAnotherScreen() {
+        assertEquals(true, httpProblem(458).contains("another screen"))
+        assertEquals(true, httpProblem(458).contains("458"))
+    }
 }

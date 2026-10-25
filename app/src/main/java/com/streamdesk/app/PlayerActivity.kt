@@ -148,6 +148,7 @@ class PlayerActivity : ComponentActivity() {
     private var detectedFormat = StreamFormat.Auto
     private var tryingFormat = StreamFormat.Auto
     private var retries = 0
+    private var busyRetries = 0
     private var clientAttempt = 0   // index into CLIENT_USER_AGENTS for channels without their own
     private var reachedReady = false
     private var droppedFrames = 0
@@ -369,6 +370,7 @@ class PlayerActivity : ComponentActivity() {
         if (isTv) NowPlaying.set(queue, i)
         current = ch
         retries = 0
+        busyRetries = 0
         clientAttempt = 0
         reachedReady = false
         droppedFrames = 0
@@ -612,6 +614,15 @@ class PlayerActivity : ComponentActivity() {
             clientAttempt++
             AppLog.i("player", "  server refused the client; retrying as ${agentName(CLIENT_USER_AGENTS[clientAttempt])}")
             load()
+            return
+        }
+
+        // The account's screen limit: another screen may still be closing its stream, which takes a few seconds
+        if (httpCode in ACCOUNT_BUSY_CODES && busyRetries < BUSY_MAX_RETRIES) {
+            busyRetries++
+            AppLog.i("player", "  account busy (HTTP $httpCode); trying again ($busyRetries of $BUSY_MAX_RETRIES)")
+            status = Status("Your account is in use on another screen. Trying again ($busyRetries of $BUSY_MAX_RETRIES)…")
+            handler.postDelayed({ load() }, BUSY_RETRY_MS)
             return
         }
 
@@ -1077,6 +1088,9 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_FORMAT = "format"
         private const val MAX_RETRIES = 5
         private const val LIVE_MAX_RETRIES = 12
+        private val ACCOUNT_BUSY_CODES = setOf(458, 429)   // providers answer this when the account's screen limit is reached
+        private const val BUSY_MAX_RETRIES = 4
+        private const val BUSY_RETRY_MS = 4_000L
         private const val STALL_SECONDS = 25
 
         private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)

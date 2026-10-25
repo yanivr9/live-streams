@@ -36,6 +36,7 @@ fun httpProblem(code: Int): String = when (code) {
     404, 410 -> "nothing was found at that link (HTTP $code). It may be mistyped or expired"
     451 -> "the server refuses it for legal reasons (HTTP 451). It isn't available in your country or on your network, " +
         "or the provider blocks this app"
+    458, 429 -> "the account is already in use on another screen, or its screen limit is reached (HTTP $code)"
     in 500..599 -> "the server has a problem (HTTP $code). Try again later"
     else -> "the server answered HTTP $code"
 }
