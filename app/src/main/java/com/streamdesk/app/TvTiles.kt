@@ -1,5 +1,6 @@
 package com.streamdesk.app
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,20 @@ import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.delay
 
+/** How big the channel tiles are on the TV: more small ones on the screen, or fewer large ones. */
+enum class TileSize(val label: String, val minWidth: Int, val scale: Float) {
+    Small("Small", 150, 0.8f), Medium("Medium", 190, 1f), Large("Large", 250, 1.3f);
+
+    fun next() = entries[(ordinal + 1) % entries.size]
+
+    companion object {
+        private fun prefs(context: Context) = context.getSharedPreferences("launch", Context.MODE_PRIVATE)
+        fun load(context: Context): TileSize =
+            entries.firstOrNull { it.name == prefs(context).getString("tile_size", null) } ?: Medium
+        fun save(context: Context, size: TileSize) = prefs(context).edit().putString("tile_size", size.name).apply()
+    }
+}
+
 /**
  * A channel as a tile, for the TV: logo on top, name below. OK plays it; holding OK opens the options
  * (favorite, rename, copy link, delete). The tile the remote is on turns solid white.
@@ -59,6 +74,7 @@ fun ChannelTile(
     modifier: Modifier = Modifier,
     nowOn: String? = null,
     onGuide: (() -> Unit)? = null,
+    scale: Float = 1f,
 ) {
     var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -93,7 +109,7 @@ fun ChannelTile(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                Modifier.fillMaxWidth().height(84.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                Modifier.fillMaxWidth().height((84 * scale).dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
                 val numberText: @Composable () -> Unit = {

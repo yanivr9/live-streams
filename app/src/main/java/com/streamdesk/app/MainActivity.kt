@@ -370,6 +370,7 @@ private fun HomeScreen(
         if (found != null && dialog == null) dialog = HomeDialog.Update(found)
     }
     var openLast by remember { mutableStateOf(Resume.enabled(context)) }
+    var tileSize by remember { mutableStateOf(TileSize.load(context)) }
 
     fun playLink(link: String) = onPlay(listOf(store.find(link) ?: Channel(link, nameFromUrl(link))), 0, format)
 
@@ -545,6 +546,11 @@ private fun HomeScreen(
                             if (LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Open on last channel: " + if (openLast) "On" else "Off") }, onClick = {
                                     moreMenu = false; openLast = !openLast; Resume.setEnabled(context, openLast)
+                                })
+                            }
+                            if (LocalIsTv.current) {
+                                AppMenuItem(text = { Text("Tile size: ${tileSize.label}") }, onClick = {
+                                    moreMenu = false; tileSize = tileSize.next(); TileSize.save(context, tileSize)
                                 })
                             }
                             AppMenuItem(text = { Text("Check for updates") }, onClick = {
@@ -745,7 +751,7 @@ private fun HomeScreen(
                 EmptyState(section, filtered = query.isNotBlank() || group != null)
             } else if (isTv) {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(190.dp),
+                    columns = GridCells.Adaptive(tileSize.minWidth.dp),
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -769,6 +775,7 @@ private fun HomeScreen(
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
                             nowOn = guide[ch.url],
                             onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
+                            scale = tileSize.scale,
                         )
                     }
                 }
