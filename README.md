@@ -34,7 +34,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 - **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
 - **TV guide**: the Guide tab lists today's and tomorrow's programs on all Sport channels in time order (OK on a program
   that's on now plays it). Each IPTV channel's menu also has "TV guide" for its full schedule.
-- **Channels on screen** (TV): the home screen opens with 9 channel tiles that fill the screen. ⋮ → Channels on screen cycles 6 / 9 / 12 / 15.
+- **Channels on screen** (TV): the home screen opens with 12 channel tiles (4 × 3) that fill the screen. ⋮ → Channels on screen cycles 6 / 9 / 12 / 15 / 20.
 - **Open on last channel** (TV): starting the app goes straight to the channel you watched last. ⋮ → Open on last channel turns it off.
 - **Updates in the app**: ⋮ → Check for updates (and once when the app opens). It reads `dist/update.json` from the repo, downloads the APK it names and opens Android's installer. The link must be reachable without signing in, so the repo has to be public; see `Updates.UPDATE_URL`.
 - Opens stream links shared from other apps or tapped in a browser, and `.m3u` files from a file manager.

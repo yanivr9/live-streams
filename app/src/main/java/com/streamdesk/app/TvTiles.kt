@@ -43,7 +43,7 @@ import kotlinx.coroutines.delay
 
 /** How many channel tiles fit on the first TV screen: the columns and rows are chosen so they fill it. */
 enum class TileCount(val count: Int, val columns: Int, val rows: Int) {
-    Six(6, 3, 2), Nine(9, 3, 3), Twelve(12, 4, 3), Fifteen(15, 5, 3);
+    Six(6, 3, 2), Nine(9, 3, 3), Twelve(12, 4, 3), Fifteen(15, 5, 3), Twenty(20, 5, 4);
 
     val label: String get() = "$count"
 
@@ -52,8 +52,8 @@ enum class TileCount(val count: Int, val columns: Int, val rows: Int) {
     companion object {
         private fun prefs(context: Context) = context.getSharedPreferences("launch", Context.MODE_PRIVATE)
         fun load(context: Context): TileCount =
-            entries.firstOrNull { it.name == prefs(context).getString("tile_count", null) } ?: Nine
-        fun save(context: Context, size: TileCount) = prefs(context).edit().putString("tile_count", size.name).apply()
+            entries.firstOrNull { it.name == prefs(context).getString("tiles", null) } ?: Twelve
+        fun save(context: Context, size: TileCount) = prefs(context).edit().putString("tiles", size.name).apply()
     }
 }
 
