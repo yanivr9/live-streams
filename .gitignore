@@ -8,3 +8,6 @@ app/src/test/java/com/streamdesk/app/RealDataTest.kt
 build/
 debug.keystore
 local.properties
+
+# The published update (see scripts/release.sh)
+!dist/StreamDesk.apk
