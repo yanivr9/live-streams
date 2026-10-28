@@ -115,6 +115,8 @@ object LinkReceiver {
             return queue to NowPlaying.index.coerceIn(queue.indices)
         }
 
+        override fun logs(): String = AppLog.text()
+
         override fun login(request: LoginRequest) {
             AppLog.i("link", "A phone sent a login for ${request.login.base}")
             main.post {

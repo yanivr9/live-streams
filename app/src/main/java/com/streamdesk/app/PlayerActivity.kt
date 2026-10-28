@@ -344,6 +344,16 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    // Opened straight into the player (sent from the phone, or Android had closed the app's home screen):
+    // leaving it should land on the app's channels, not on the TV's own home screen
+    override fun finish() {
+        if (isTv && isTaskRoot) {
+            AppLog.i("player", "  back to the channels")
+            runCatching { startActivity(Intent(this, MainActivity::class.java)) }
+        }
+        super.finish()
+    }
+
     override fun onDestroy() {
         if (isTv) NowPlaying.clear()
         handler.removeCallbacksAndMessages(null)

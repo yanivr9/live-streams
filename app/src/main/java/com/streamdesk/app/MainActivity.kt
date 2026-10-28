@@ -218,6 +218,7 @@ private sealed interface HomeDialog {
     data class PickTv(val job: TvJob) : HomeDialog
     data class Update(val info: UpdateInfo) : HomeDialog
     data class Guide(val channel: Channel, val login: XtreamLogin) : HomeDialog
+    data class TvLogs(val tvName: String, val text: String) : HomeDialog
 }
 
 /** Live TV / Movies / Series filter; Episode items only appear in Recent. */
@@ -333,6 +334,14 @@ private fun HomeScreen(
     }
 
     fun runTvJob(job: TvJob, device: TvDevice, code: String) {
+        if (job is TvJob.Logs) {
+            scope.launch {
+                withContext(Dispatchers.IO) { runCatching { LinkClient.logs(device, code) } }
+                    .onSuccess { LinkPrefs.save(context, device.host, code); dialog = HomeDialog.TvLogs(device.name, it) }
+                    .onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+            }
+            return
+        }
         if (job is TvJob.TakeOver) {
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { LinkClient.takeOver(device, code) } }
@@ -345,7 +354,7 @@ private fun HomeScreen(
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     when (job) {
-                        TvJob.TakeOver -> Unit
+                        TvJob.TakeOver, TvJob.Logs -> Unit
                         is TvJob.Play -> LinkClient.play(device, code, job.queue, job.index)
                         is TvJob.Login -> LinkClient.sendLogin(
                             device, code,
@@ -552,6 +561,9 @@ private fun HomeScreen(
                             if (!LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Continue from TV") }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.PickTv(TvJob.TakeOver)
+                                })
+                                AppMenuItem(text = { Text("Logs from TV") }, onClick = {
+                                    moreMenu = false; dialog = HomeDialog.PickTv(TvJob.Logs)
                                 })
                             }
                             AppMenuItem(text = { Text("Edit Sport list") }, onClick = {
@@ -966,7 +978,7 @@ private fun HomeScreen(
             onConfirm = { query = it.trim(); dialog = null },
         )
         is HomeDialog.PickTv -> TvPickerDialog(
-            title = when (d.job) { is TvJob.Login -> "Send login to TV"; TvJob.TakeOver -> "Continue from TV"; else -> "Play on TV" },
+            title = when (d.job) { is TvJob.Login -> "Send login to TV"; TvJob.TakeOver -> "Continue from TV"; TvJob.Logs -> "Logs from TV"; else -> "Play on TV" },
             onDismiss = { dialog = null },
             onChosen = { device, code -> dialog = null; runTvJob(d.job, device, code) },
         )
@@ -976,6 +988,22 @@ private fun HomeScreen(
             onSave = { sportStore.save(it); dialog = null; section = Section.Sport },
         )
         is HomeDialog.Update -> UpdateDialog(d.info, onDismiss = { dialog = null })
+        is HomeDialog.TvLogs -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Logs from ${d.tvName}") },
+            text = {
+                Text(
+                    d.text.ifBlank { "The TV hasn't logged anything yet." },
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); dialog = null; notify("TV logs copied. Passwords are hidden.") }) { Text("Copy") }
+            },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
+        )
         is HomeDialog.Guide -> ChannelGuideDialog(d.channel, d.login, onPlay = { dialog = null; playSport(d.channel) }, onDismiss = { dialog = null })
         HomeDialog.Logs -> LogsScreen(
             onDismiss = { dialog = null },

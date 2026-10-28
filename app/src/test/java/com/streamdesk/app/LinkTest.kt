@@ -18,6 +18,7 @@ class LinkTest {
         override fun login(request: LoginRequest) { login = request }
         var nowPlaying: Pair<List<Channel>, Int>? = null
         override fun takeOver() = nowPlaying?.also { commands += "stop" }
+        override fun logs() = "12:00 player Open \"Sport 1\""
     }
 
     private val recorder = Recorder()
@@ -36,6 +37,12 @@ class LinkTest {
 
     private fun failsWith(kind: LinkException.Kind, block: () -> Unit) {
         try { block(); fail("expected a LinkException") } catch (e: LinkException) { assertEquals(kind, e.kind) }
+    }
+
+    @Test
+    fun phoneReadsTheTvLogs() {
+        assertEquals("12:00 player Open \"Sport 1\"", LinkClient.logs(tv, "123456"))
+        failsWith(LinkException.Kind.WrongCode) { LinkClient.logs(tv, "000000") }
     }
 
     @Test

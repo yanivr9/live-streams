@@ -28,6 +28,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   codes are locked out. Scanning the QR code with the phone's camera opens a page on the TV with a button that starts
   Stream Desk on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
   send the login.
+- **Logs from TV**: on the phone, ⋮ → Logs from TV shows the TV's activity log (passwords hidden) with a Copy button, since copying on a TV box goes nowhere.
 - **Continue on phone**: ⋮ → Continue from TV on the phone (or Play here on the phone's remote screen) stops the TV and carries on
   with the same channel on the phone, so only one screen uses the account at a time.
 - **Sound with the screen off** (phone): the channel's sound keeps playing when the screen turns off or you leave the app. A notification shows the channel with a Stop button. ⋮ → Sound with the screen off turns it off, and then a live stream is closed when the app is left.

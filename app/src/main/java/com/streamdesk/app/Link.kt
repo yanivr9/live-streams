@@ -42,6 +42,8 @@ interface LinkHandler {
     fun login(request: LoginRequest)
     /** "Continue on phone": what the TV is playing (channels and position), and stop playing it. Null if nothing plays. */
     fun takeOver(): Pair<List<Channel>, Int>?
+    /** The TV's activity log (passwords already hidden), so it can be read on the phone. */
+    fun logs(): String
 }
 
 /** Why a call to the TV failed, in words the user can act on. */
@@ -130,7 +132,7 @@ class LinkServer(
         if (method == "GET" && path == "/ping") {
             return 200 to JSONObject().put("app", "streamdesk").put("name", deviceName).put("version", version)
         }
-        if (method != "POST" || path !in setOf("/play", "/command", "/login", "/takeover")) return 404 to error("not found")
+        if (method != "POST" || path !in setOf("/play", "/command", "/login", "/takeover", "/logs")) return 404 to error("not found")
         authorize(given)?.let { return it }
         val json = runCatching { JSONObject(body) }.getOrNull() ?: return 400 to error("bad request")
         when (path) {
@@ -141,6 +143,7 @@ class LinkServer(
                 handler.play(queue, json.optInt("index").coerceIn(queue.indices))
             }
             "/command" -> handler.command(json.optString("action"))
+            "/logs" -> return 200 to JSONObject().put("text", handler.logs())
             "/takeover" -> {
                 val (queue, index) = handler.takeOver() ?: return 409 to error("nothing playing")
                 return 200 to JSONObject().put("index", index).put("queue", JSONArray().also { a -> queue.forEach { a.put(it.toJson()) } })
@@ -271,6 +274,10 @@ object LinkClient {
         if (queue.isEmpty()) throw LinkException(LinkException.Kind.Other, "The TV didn't say what it's playing.")
         return queue to json.optInt("index").coerceIn(queue.indices)
     }
+
+    /** The TV's activity log, to read and copy on the phone. */
+    fun logs(device: TvDevice, code: String): String =
+        request("POST", device.host, device.port, "/logs", code, "{}").optString("text")
 
     fun sendLogin(device: TvDevice, code: String, request: LoginRequest) {
         val body = JSONObject()

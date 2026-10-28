@@ -56,6 +56,8 @@ sealed interface TvJob {
     data class Login(val source: PlaylistSource) : TvJob
     /** Continue on this phone with what the TV is playing. */
     data object TakeOver : TvJob
+    /** Show the TV's log on the phone. */
+    data object Logs : TvJob
 }
 
 /** Phone: choose a TV on the Wi-Fi (or type its address), then enter the code shown on it. */
