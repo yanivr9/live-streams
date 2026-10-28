@@ -152,6 +152,8 @@ class PlayerActivity : ComponentActivity() {
     private var tryingFormat = StreamFormat.Auto
     private var retries = 0
     private var busyRetries = 0
+    private var slowStarts = 0   // times this channel didn't start within START_TIMEOUT_MS
+    private val startTimeout = Runnable { onSlowStart() }
     private var streamOpen = false   // a stream is open (or opening) with the provider
     private var clientAttempt = 0   // index into CLIENT_USER_AGENTS for channels without their own
     private var reachedReady = false
@@ -408,6 +410,7 @@ class PlayerActivity : ComponentActivity() {
         current = ch
         retries = 0
         busyRetries = 0
+        slowStarts = 0
         clientAttempt = 0
         reachedReady = false
         droppedFrames = 0
@@ -453,6 +456,7 @@ class PlayerActivity : ComponentActivity() {
 
         status = Status("Connecting…")
         streamOpen = true
+        handler.postDelayed(startTimeout, START_TIMEOUT_MS)
         AppLog.i("player", "  loading as ${tryingFormat.label} with ${agentName(ch.userAgent.ifBlank { CLIENT_USER_AGENTS[clientAttempt] })}")
         player.setMediaSource(buildSource(ch, tryingFormat))
         player.prepare()
@@ -624,6 +628,7 @@ class PlayerActivity : ComponentActivity() {
                     status = null
                     retries = 0
                     reachedReady = true
+                    handler.removeCallbacks(startTimeout)
                 }
                 Player.STATE_ENDED -> if (liveLike()) reconnectLive("the stream ended") else status = Status("Finished playing.")
                 else -> Unit
@@ -699,6 +704,50 @@ class PlayerActivity : ComponentActivity() {
         }
 
         status = Status(explain(e), isError = true)
+    }
+
+    /**
+     * The channel connected but no picture came within START_TIMEOUT_MS. Some providers keep a refused connection open
+     * instead of answering, which looks like an endless black screen: try once more, then say why if we can tell.
+     */
+    private fun onSlowStart() {
+        if (reachedReady || castTarget != null || status?.isError == true) return
+        slowStarts++
+        AppLog.e("player", "  no picture after ${START_TIMEOUT_MS / 1000}s (attempt $slowStarts)")
+        player.stop()
+        streamOpen = false
+        if (slowStarts == 1) {
+            status = Status("Still connecting… trying again")
+            handler.postDelayed({ load() }, SWITCH_GAP_MS)
+            return
+        }
+        status = Status("This channel isn't starting. Checking your account…")
+        checkAccountInUse()
+    }
+
+    /** Asks the provider how many screens are in use, to tell "another screen is playing" from a channel problem. */
+    private fun checkAccountInUse() {
+        val ch = queue.getOrNull(index) ?: return
+        val login = store.sources.value.firstOrNull { it.url == ch.source }?.xtream
+        lifecycleScope.launch {
+            val user = login?.let {
+                withContext(Dispatchers.IO) {
+                    runCatching { JSONObject(fetchText(it.api(), it.userAgent.ifBlank { null }).text).optJSONObject("user_info") }.getOrNull()
+                }
+            }
+            val active = user?.optString("active_cons")?.toIntOrNull()
+            val max = user?.optString("max_connections")?.toIntOrNull()
+            AppLog.i("player", "  account: ${active ?: "?"} of ${max ?: "?"} screens in use")
+            status = if (active != null && max != null && max > 0 && active >= max) {
+                Status(
+                    "Your account is already playing on another screen ($active of $max in use), maybe your phone with the sound on in the background. " +
+                        "Stop it there, then press OK to try again.",
+                    isError = true,
+                )
+            } else {
+                Status("This channel isn't starting right now. Press OK to try again, or choose another channel.", isError = true)
+            }
+        }
     }
 
     /** Is this a live stream (as opposed to a movie)? Providers' .ts streams don't announce that themselves. */
@@ -1150,6 +1199,7 @@ class PlayerActivity : ComponentActivity() {
         private const val BUSY_MAX_RETRIES = 4
         private const val BUSY_RETRY_MS = 4_000L
         private const val SWITCH_GAP_MS = 1_200L
+        private const val START_TIMEOUT_MS = 15_000L
         private const val STALL_SECONDS = 25
 
         private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)

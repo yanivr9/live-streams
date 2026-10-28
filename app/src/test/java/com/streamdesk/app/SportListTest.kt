@@ -22,7 +22,7 @@ class SportListTest {
     @Test
     fun picksEightChannelsInOrderWithLabels() {
         assertEquals(
-            listOf("Sport 1", "Sport 2", "Sport 3", "Sport 4", "Sport 5", "Sport 5+", "Sport 5 Live", "Sport 5 Stars", "Sport 6", "ONE 1", "ONE 2"),
+            listOf("Sport 1", "Sport 2", "Sport 3", "Sport 4", "Sport 5", "Sport 5+", "Sport 5 Live", "Sport 5 Stars", "Sport 5 Gold", "Sport 5+ Max", "Sport 6", "ONE 1", "ONE 2"),
             pick(QualityCap.Best).map { it.name },
         )
     }
@@ -53,7 +53,8 @@ class SportListTest {
     fun everyListedChannelHasItsLogo() {
         val picked = pick(QualityCap.Best)
         val expected = listOf("sport1", "sport2", "sport3", "sport4", "sport5", "sport5plus", "sport5live", "sport5stars", "sport6", "one1", "one2")
-        assertEquals(expected.map { "file:///android_asset/logos/$it.png" }, picked.map { it.logo })
+        // Sport 5 Gold and 5+ Max have no logo of their own in the app: they keep the provider's
+        assertEquals(expected.map { "file:///android_asset/logos/$it.png" }, picked.filter { it.name !in setOf("Sport 5 Gold", "Sport 5+ Max") }.map { it.logo })
         // ...and the files are really in the app
         for (name in expected) assertEquals(true, java.io.File("src/main/assets/logos/$name.png").exists())
     }
@@ -75,5 +76,32 @@ class SportListTest {
         val s = SportSettings("Sport 1 = YES SPORT 1\nNo Such Channel\n# comment\n\nONE 2", QualityCap.Best)
         assertEquals(listOf("Sport 1", "ONE 2"), SportList.pick(channels, s).map { it.name })
         assertEquals(channels.size, SportList.pick(channels, SportSettings("  \n", QualityCap.Best)).size)   // all have "Sport" in the folder
+    }
+
+    @Test
+    fun sport5TabShowsEveryVariantGroupedBestFirst() {
+        fun ch(name: String) = Channel("http://h/live/u/p/${name.hashCode()}.ts", name, "Hebrew - Sport")
+        val names = listOf(
+            "IL: Sport 5 HD", "IL: Sport 5 4K HDR", "IL: Sport 5+ Live FHD", "IL: Sport 5 Gold", "IL: Sport 5+ Gold 4K",
+            "IL: Sport 5+ Max FHD", "IL: Sport 5+ Plus 4K", "IL: Sport 5 Plus", "IL: Sport 5+ Stars HD", "IL: Sport 50", "IL: Sport 5 Extra",
+        )
+        val all = SportList.sport5All(names.map(::ch))
+        assertEquals(
+            listOf(
+                "Sport 5 4K HDR", "Sport 5 HD", "Sport 5+ Plus 4K", "Sport 5 Plus", "Sport 5+ Live FHD", "Sport 5+ Stars HD",
+                "Sport 5+ Gold 4K", "Sport 5 Gold", "Sport 5+ Max FHD",
+            ),
+            all.map { it.name },
+        )
+    }
+
+    @Test
+    fun sportTabNowHasGoldAndMax() {
+        val list = SportList.pick(
+            listOf(Channel("http://h/1", "IL: Sport 5+ Gold 4K"), Channel("http://h/2", "IL: Sport 5 Gold"), Channel("http://h/3", "IL: Sport 5+ Max FHD")),
+            SportList.DEFAULT,
+        )
+        assertEquals(listOf("Sport 5 Gold", "Sport 5+ Max"), list.map { it.name })
+        assertEquals("4K", list[0].group)
     }
 }

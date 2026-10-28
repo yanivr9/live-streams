@@ -29,6 +29,8 @@ object SportList {
         Sport 5+ = Sport 5+ | Sport 5 Plus
         Sport 5 Live = Sport 5+ Live
         Sport 5 Stars = Sport 5+ Stars
+        Sport 5 Gold = Sport 5 Gold | Sport 5+ Gold
+        Sport 5+ Max = Sport 5+ Max
         Sport 6 = YES SPORT 6
         ONE 1
         ONE 2
@@ -36,6 +38,19 @@ object SportList {
 
     /** Earlier defaults: a phone that still has one of these (never edited) gets the new default. */
     val OLD_DEFAULT_TEXTS = listOf(
+        """
+        Sport 1 = YES SPORT 1
+        Sport 2 = YES SPORT 2
+        Sport 3 = YES SPORT 3
+        Sport 4 = YES SPORT 4
+        Sport 5 = Sport 5
+        Sport 5+ = Sport 5+ | Sport 5 Plus
+        Sport 5 Live = Sport 5+ Live
+        Sport 5 Stars = Sport 5+ Stars
+        Sport 6 = YES SPORT 6
+        ONE 1
+        ONE 2
+        """.trimIndent(),
         """
         Sport 1 = YES SPORT 1
         Sport 2 = YES SPORT 2
@@ -91,6 +106,10 @@ object SportList {
         if (rest.isNotEmpty() && !rest[0].isWhitespace()) return null   // "SPORT 1" must not match "SPORT 10"
         val words = rest.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.any { it !in QUALITY_WORDS }) return null            // "SPORT 5 GOLD" is another channel
+        return qualityOf(words)
+    }
+
+    private fun qualityOf(words: List<String>): Quality {
         val fourK = "4K" in words || "UHD" in words
         val score = when {
             fourK -> 5.0 + if ("HDR" in words) 0.5 else 0.0
@@ -109,6 +128,38 @@ object SportList {
             else -> ""
         }
         return Quality(score, label)
+    }
+
+    private const val SPORT5_LOGO = "sport5"
+
+    /**
+     * The Sport 5 tab: every Sport 5 channel the provider has, in every quality, grouped by channel
+     * (Sport 5, 5+, Live, Stars, Gold, Max) and best quality first.
+     */
+    fun sport5All(channels: List<Channel>): List<Channel> {
+        val families = listOf("", "PLUS", "LIVE", "STARS", "GOLD", "MAX")
+        val familyLogos = mapOf("" to SPORT5_LOGO, "PLUS" to "sport5plus", "LIVE" to "sport5live", "STARS" to "sport5stars")
+        val name = Regex("""^SPORT 5(\+)?(?=\s|$)(.*)$""")
+        return channels.mapNotNull { c ->
+            val m = name.find(c.displayName().trim().uppercase()) ?: return@mapNotNull null
+            val words = m.groupValues[2].trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            val named = words.filter { it !in QUALITY_WORDS && it != "PLUS" }   // "Sport 5 Plus" and "Sport 5+ Plus" are Sport 5+
+            val family = when {
+                named.isEmpty() -> if (m.groupValues[1].isNotEmpty() || "PLUS" in words) "PLUS" else ""
+                named.size == 1 && named[0] in families -> named[0]
+                else -> return@mapNotNull null
+            }
+            Triple(c, family, qualityOf(words.filter { it in QUALITY_WORDS }))
+        }
+            .sortedWith(compareBy({ (_, family, _) -> families.indexOf(family) }, { (_, _, q) -> -q.score }))
+            .map { (c, family, q) ->
+                // The provider's own name ("Sport 5+ UHD 4K"), so versions of the same quality can be told apart
+                c.copy(
+                    name = c.displayName(),
+                    group = q.label.ifEmpty { "Sport 5" },
+                    logo = familyLogos[family]?.let { "$LOGO_DIR$it.png" } ?: c.logo,
+                )
+            }
     }
 
     /** One channel per line of the list, in that order, each in the best quality [SportSettings.cap] allows. */
