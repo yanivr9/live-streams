@@ -12,7 +12,24 @@ enum class QualityCap(val label: String, val maxScore: Double) {
 }
 
 /** The text the user edits (one channel per line) and the quality limit. */
-data class SportSettings(val text: String, val cap: QualityCap)
+data class SportSettings(val text: String, val cap: QualityCap) {
+    /** The same list, never above [limit] (the lower of the two limits wins). */
+    fun limitedTo(limit: QualityCap) = if (limit.maxScore < cap.maxScore) copy(cap = limit) else this
+}
+
+/**
+ * The highest quality the tiles may pick on this TV. A Mi Box takes minutes to show a picture on these 4K streams,
+ * so a TV starts at Full HD; ⋮ → Quality on this TV switches 4K back on. Phones always use the Sport list's own limit.
+ */
+object DeviceQuality {
+    private fun prefs(context: Context) = context.getSharedPreferences("launch", Context.MODE_PRIVATE)
+
+    fun cap(context: Context): QualityCap =
+        if (!context.isTelevision()) QualityCap.Best
+        else runCatching { QualityCap.valueOf(prefs(context).getString("tv_quality", null).orEmpty()) }.getOrDefault(QualityCap.FullHd)
+
+    fun set(context: Context, cap: QualityCap) = prefs(context).edit().putString("tv_quality", cap.name).apply()
+}
 
 /**
  * The Sport tab: a short list of chosen channels. Providers offer each channel in several qualities
@@ -130,6 +147,10 @@ object SportList {
         return Quality(score, label)
     }
 
+    /** How good the picture is, judging by the channel's name: 5+ is 4K, 4 Full HD, 3 HD, 1 SD, 2 when the name doesn't say. */
+    fun qualityScore(channel: Channel): Double =
+        qualityOf(channel.displayName().trim().uppercase().split(Regex("\\s+")).filter { it in QUALITY_WORDS }).score
+
     private const val SPORT5_LOGO = "sport5"
 
     /**
@@ -192,7 +213,7 @@ object IsraelList {
         QualityCap.Best,
     )
 
-    fun pick(channels: List<Channel>): List<Channel> = SportList.pick(channels, SETTINGS)
+    fun pick(channels: List<Channel>, limit: QualityCap = QualityCap.Best): List<Channel> = SportList.pick(channels, SETTINGS.limitedTo(limit))
 }
 
 /** The Sport list settings, kept on the phone. */

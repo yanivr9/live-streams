@@ -104,4 +104,16 @@ class SportListTest {
         assertEquals(listOf("Sport 5 Gold", "Sport 5+ Max"), list.map { it.name })
         assertEquals("4K", list[0].group)
     }
+
+    @Test
+    fun aTvLimitedToFullHdNeverPicks4K() {
+        val tv = SportList.pick(channels, SportList.DEFAULT.limitedTo(QualityCap.FullHd)).associateBy { it.name }
+        assertEquals(urlOf("IL: Sport 5 FHD P50"), tv.getValue("Sport 5").url)
+        assertEquals(urlOf("IL: ONE 1 FHD P50"), tv.getValue("ONE 1").url)
+        assertEquals(true, tv.values.none { it.group.startsWith("4K") })
+        // A stricter list limit stays as it is
+        assertEquals(QualityCap.Hd, SportSettings("", QualityCap.Hd).limitedTo(QualityCap.FullHd).cap)
+        assertEquals(5.5, SportList.qualityScore(Channel("http://x", "IL: Sport 5 4K HDR")), 0.0)
+        assertEquals(4.0, SportList.qualityScore(Channel("http://x", "IL: Sport 5 FHD")), 0.0)
+    }
 }

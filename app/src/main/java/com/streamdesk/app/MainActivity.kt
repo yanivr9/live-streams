@@ -182,9 +182,12 @@ class MainActivity : ComponentActivity() {
     /** On a TV: straight to the channel watched last, with the Sport list as the channels to switch between. */
     private fun resumeLast(store: ChannelStore) {
         val last = store.recent.value.firstOrNull { it.kind == Kind.LIVE } ?: return
-        val sport = SportList.pick(store.channels.value, SportSettingsStore.get(this).settings.value)
+        val limit = DeviceQuality.cap(this)
+        // A 4K channel watched before the TV's limit was set would open on a black screen again: stay on the channels instead
+        if (SportList.qualityScore(last) > limit.maxScore) return
         val all = store.channels.value
-        val (queue, index) = Resume.queue(last, listOf(sport, IsraelList.pick(all), SportList.sport5All(all)))
+        val sport = SportList.pick(all, SportSettingsStore.get(this).settings.value.limitedTo(limit))
+        val (queue, index) = Resume.queue(last, listOf(sport, IsraelList.pick(all, limit), SportList.sport5All(all)))
         openPlayer(queue, index, StreamFormat.Auto)
     }
 
@@ -449,13 +452,14 @@ private fun HomeScreen(
         }
     }
     // The Sport tab: the channels chosen in the Sport list, each in its best quality
-    val sportPicked = remember(scoped, sportSettings) { SportList.pick(scoped, sportSettings) }
+    var deviceQuality by remember { mutableStateOf(DeviceQuality.cap(context)) }
+    val sportPicked = remember(scoped, sportSettings, deviceQuality) { SportList.pick(scoped, sportSettings.limitedTo(deviceQuality)) }
     fun loginFor(ch: Channel): XtreamLogin? = if (ch.kind == Kind.LIVE) sources.firstOrNull { it.url == ch.source }?.xtream else null
     fun playSport(ch: Channel) {
         val i = sportPicked.indexOfFirst { it.url == ch.url }
         if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
     }
-    val israelPicked = remember(scoped) { IsraelList.pick(scoped) }
+    val israelPicked = remember(scoped, deviceQuality) { IsraelList.pick(scoped, deviceQuality) }
     val sport5All = remember(scoped) { SportList.sport5All(scoped) }
     // What's on now, from the provider's guide; refreshed every few minutes
     var guide by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -580,6 +584,12 @@ private fun HomeScreen(
                             if (LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Channels on screen: ${tileCount.label}") }, onClick = {
                                     moreMenu = false; tileCount = tileCount.next(); TileCount.save(context, tileCount)
+                                })
+                                AppMenuItem(text = { Text("Quality on this TV: " + if (deviceQuality == QualityCap.Best) "Best (4K)" else "Up to Full HD") }, onClick = {
+                                    moreMenu = false
+                                    deviceQuality = if (deviceQuality == QualityCap.Best) QualityCap.FullHd else QualityCap.Best
+                                    DeviceQuality.set(context, deviceQuality)
+                                    notify(if (deviceQuality == QualityCap.Best) "Tiles now pick 4K when there is one." else "Tiles now pick Full HD at most.")
                                 })
                             }
                             if (!LocalIsTv.current) {
