@@ -36,7 +36,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -593,7 +595,24 @@ private fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        // On a phone, swiping left or right on the channels moves to the next or previous tab
+        val swipeToTab = if (isTv) Modifier else Modifier.pointerInput(Unit) {
+            var travelled = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { travelled = 0f },
+                onDragEnd = {
+                    val tabs = Section.entries
+                    val next = when {
+                        travelled <= -120f -> section.ordinal + 1    // finger moved left: the next tab
+                        travelled >= 120f -> section.ordinal - 1
+                        else -> section.ordinal
+                    }
+                    if (next in tabs.indices) section = tabs[next]
+                },
+                onDragCancel = { travelled = 0f },
+            ) { _, dragAmount -> travelled += dragAmount }
+        }
+        Column(Modifier.padding(padding).fillMaxSize().then(swipeToTab)) {
             if (isTv) {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(10.dp).background(OnAir, CircleShape))
