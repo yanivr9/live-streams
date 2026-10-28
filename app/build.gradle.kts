@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "3.14"
+        versionCode = 36
+        versionName = "3.15"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one

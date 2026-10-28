@@ -58,6 +58,7 @@ object SportList {
         "SPORT 5 LIVE" to "sport5live", "SPORT 5+ LIVE" to "sport5live",
         "SPORT 5 STARS" to "sport5stars", "SPORT 5+ STARS" to "sport5stars",
         "ONE 1" to "one1", "ONE 2" to "one2",
+        "KAN 11" to "kan11", "KAN11" to "kan11", "CHANNEL 12" to "channel12", "CHANNEL 13" to "channel13", "CHANNEL 14" to "channel14",
     )
 
     private fun logoFor(entry: Entry): String? =
@@ -125,6 +126,22 @@ object SportList {
             channel.copy(name = entry.label, group = quality.label, logo = logoFor(entry) ?: channel.logo)
         }
     }
+}
+
+/** The Israeli TV tab: the main Israeli channels, each in the best quality, picked the same way as the Sport list. */
+object IsraelList {
+    private val SETTINGS = SportSettings(
+        """
+        Channel 11 · Kan = Kan 11 | Kan11
+        Channel 12 · Keshet = Channel 12
+        Channel 13 · Reshet = Channel 13
+        Channel 14 = Channel 14
+        Channel 15 = Channel 15
+        """.trimIndent(),
+        QualityCap.Best,
+    )
+
+    fun pick(channels: List<Channel>): List<Channel> = SportList.pick(channels, SETTINGS)
 }
 
 /** The Sport list settings, kept on the phone. */

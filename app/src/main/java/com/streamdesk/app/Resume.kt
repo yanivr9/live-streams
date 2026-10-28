@@ -11,8 +11,11 @@ object Resume {
     fun setEnabled(context: Context, on: Boolean) = prefs(context).edit().putBoolean("open_last", on).apply()
 
     /** The channels to play and where to start: the last one watched, inside the Sport list if it belongs there. */
-    fun queue(last: Channel, sport: List<Channel>): Pair<List<Channel>, Int> {
-        val i = sport.indexOfFirst { it.url == last.url }
-        return if (i >= 0) sport to i else listOf(last) to 0
+    fun queue(last: Channel, lists: List<List<Channel>>): Pair<List<Channel>, Int> {
+        for (list in lists) {
+            val i = list.indexOfFirst { it.url == last.url }
+            if (i >= 0) return list to i
+        }
+        return listOf(last) to 0
     }
 }

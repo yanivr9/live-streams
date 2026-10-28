@@ -174,7 +174,7 @@ class MainActivity : ComponentActivity() {
     private fun resumeLast(store: ChannelStore) {
         val last = store.recent.value.firstOrNull { it.kind == Kind.LIVE } ?: return
         val sport = SportList.pick(store.channels.value, SportSettingsStore.get(this).settings.value)
-        val (queue, index) = Resume.queue(last, sport)
+        val (queue, index) = Resume.queue(last, listOf(sport, IsraelList.pick(store.channels.value)))
         openPlayer(queue, index, StreamFormat.Auto)
     }
 
@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Section(val label: String) {
-    All("All"), Sport("Sport"), Guide("Guide"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
+    All("All"), Sport("Sport"), Israel("Israeli TV"), Guide("Guide"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
 }
 
 private sealed interface HomeDialog {
@@ -435,12 +435,13 @@ private fun HomeScreen(
         val i = sportPicked.indexOfFirst { it.url == ch.url }
         if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
     }
+    val israelPicked = remember(scoped) { IsraelList.pick(scoped) }
     // What's on now, from the provider's guide; refreshed every few minutes
     var guide by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    LaunchedEffect(sportPicked, sources) {
+    LaunchedEffect(sportPicked, israelPicked, sources) {
         while (true) {
             val next = HashMap<String, String>()
-            for (ch in sportPicked) {
+            for (ch in sportPicked + israelPicked) {
                 val login = sources.firstOrNull { it.url == ch.source }?.xtream ?: continue
                 val programs = runCatching { Epg.load(login, ch.url) }.getOrDefault(emptyList())
                 Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { next[ch.url] = it }
@@ -450,12 +451,13 @@ private fun HomeScreen(
         }
     }
     val groups = remember(scoped, section) {
-        if (section == Section.Sport) emptyList() else scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
+        if (section == Section.Sport || section == Section.Israel) emptyList() else scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
     }
-    val visible = remember(scoped, sportPicked, channels, recent, section, group, query, kindFilter) {
+    val visible = remember(scoped, sportPicked, israelPicked, channels, recent, section, group, query, kindFilter) {
         val base = when (section) {
             Section.All -> scoped
             Section.Sport -> sportPicked
+            Section.Israel -> israelPicked
             Section.Favorites -> scoped.filter { it.favorite }
             Section.Recent -> {
                 val saved = channels.associateBy { it.url }
@@ -767,7 +769,7 @@ private fun HomeScreen(
                         ChannelTile(
                             modifier = (if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier).height(rowHeight),
                             channel = ch,
-                            number = if (section == Section.Sport) i + 1 else numbers[ch.url],
+                            number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
                             saved = numbers[ch.url] != null,
                             onClick = {
                                 if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
@@ -792,7 +794,7 @@ private fun HomeScreen(
                         ChannelRow(
                             modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
                             channel = ch,
-                            number = if (section == Section.Sport) i + 1 else numbers[ch.url],
+                            number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
                             saved = numbers[ch.url] != null,
                             onClick = {
                                 if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
@@ -1218,6 +1220,7 @@ private fun EmptyState(section: Section, filtered: Boolean) {
         filtered -> "No channels match your search."
         section == Section.Favorites -> "No favorites yet. Tap the star next to a channel to pin it here."
         section == Section.Recent -> "Channels you play will show up here."
+        section == Section.Israel -> "No Israeli channels found. They show up here once your account has Channel 11, 12, 13, 14 or 15."
         section == Section.Sport -> "No sport channels found. Tap ⋮ → Edit Sport list to choose which channels appear here."
         section == Section.Playlists || section == Section.Guide -> ""
         else -> "No channels yet. Paste a stream link above, or import an M3U playlist with the + button."

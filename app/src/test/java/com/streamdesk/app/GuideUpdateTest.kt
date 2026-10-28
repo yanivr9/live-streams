@@ -46,8 +46,10 @@ class GuideUpdateTest {
     fun resumeStaysInsideTheSportList() {
         fun ch(n: Int) = Channel("http://x/$n", "c$n", "")
         val sport = listOf(ch(1), ch(2), ch(3))
-        assertEquals(sport to 1, Resume.queue(ch(2), sport))
-        assertEquals(listOf(ch(9)) to 0, Resume.queue(ch(9), sport))
+        val israel = listOf(ch(11), ch(12))
+        assertEquals(sport to 1, Resume.queue(ch(2), listOf(sport, israel)))
+        assertEquals(israel to 1, Resume.queue(ch(12), listOf(sport, israel)))
+        assertEquals(listOf(ch(9)) to 0, Resume.queue(ch(9), listOf(sport, israel)))
     }
 
     @Test
@@ -68,5 +70,19 @@ class GuideUpdateTest {
         assertEquals(3, days.size)
         assertEquals(true, list[1].isOn(now))
         assertEquals(false, list[2].isOn(now))
+    }
+
+    @Test
+    fun israeliTabPicksTheBestQualityOfChannels11To15() {
+        fun ch(name: String) = Channel("http://h/live/u/p/${name.hashCode()}.ts", name, "Hebrew")
+        val provider = listOf(
+            ch("IL: Kan 11 4K"), ch("IL: Kan11 FHD"), ch("IL: Kan11 HD"), ch("IL: Makan FHD"), ch("IL: Kan33"),
+            ch("IL: Channel 12 4K"), ch("IL: Channel 12 HD"), ch("IL: Channel 13 FHD"), ch("IL: Channel 13 SD"),
+            ch("IL: Channel 14 HD"), ch("IL: Channel 14 HD"), ch("IL: Channel 120"), ch("IL: HOT Cinema"),
+        )
+        val picked = IsraelList.pick(provider)
+        assertEquals(listOf("Channel 11 · Kan", "Channel 12 · Keshet", "Channel 13 · Reshet", "Channel 14"), picked.map { it.name })   // no 15 at this provider
+        assertEquals(listOf("4K", "4K", "Full HD", "HD"), picked.map { it.group })
+        assertEquals(true, picked.all { it.logo.startsWith("file:///android_asset/logos/") })
     }
 }
