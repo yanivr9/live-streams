@@ -32,7 +32,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   with the same channel on the phone, so only one screen uses the account at a time.
 - **Auto-reconnect**: a live stream that ends, errors or freezes for 25 s reconnects up to 12 times (1, 2, 4 and 8 s apart, then every 8 s).
 - **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
-- **Swipe between tabs** (phone): swipe left or right on the channels to go to the next or previous tab (All, Sport, Israeli TV, Guide, …).
+- **Swipe between tabs** (phone): drag left or right on the channels: they follow your finger, and when you let go the next or previous tab slides in (All, Sport, Israeli TV, Guide, …).
 - **Israeli TV tab**: Channel 11 (Kan), 12, 13, 14 and 15, each with its logo and in the best quality, picked the same way as the Sport list. Channels the account doesn't have are left out.
 - **TV guide**: the Guide tab lists today's and tomorrow's programs on all Sport channels in time order (OK on a program
   that's on now plays it). Each IPTV channel's menu also has "TV guide" for its full schedule.

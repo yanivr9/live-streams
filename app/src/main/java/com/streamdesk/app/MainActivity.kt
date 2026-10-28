@@ -37,6 +37,13 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.ComponentActivity
@@ -595,24 +602,42 @@ private fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        // On a phone, swiping left or right on the channels moves to the next or previous tab
-        val swipeToTab = if (isTv) Modifier else Modifier.pointerInput(Unit) {
-            var travelled = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { travelled = 0f },
-                onDragEnd = {
-                    val tabs = Section.entries
-                    val next = when {
-                        travelled <= -120f -> section.ordinal + 1    // finger moved left: the next tab
-                        travelled >= 120f -> section.ordinal - 1
-                        else -> section.ordinal
-                    }
-                    if (next in tabs.indices) section = tabs[next]
-                },
-                onDragCancel = { travelled = 0f },
-            ) { _, dragAmount -> travelled += dragAmount }
-        }
-        Column(Modifier.padding(padding).fillMaxSize().then(swipeToTab)) {
+        // On a phone, the channels follow your finger as you drag left or right; when you let go, the next or previous tab opens
+        val dragX = remember { Animatable(0f) }
+        var paneWidth by remember { mutableFloatStateOf(1f) }
+        val swipeToTab = if (isTv) Modifier else Modifier
+            .onSizeChanged { paneWidth = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { scope.launch { dragX.stop() } },
+                    onDragEnd = {
+                        scope.launch {
+                            val last = Section.entries.lastIndex
+                            val dir = when {
+                                dragX.value <= -paneWidth * 0.2f && section.ordinal < last -> 1    // finger moved left: the next tab
+                                dragX.value >= paneWidth * 0.2f && section.ordinal > 0 -> -1
+                                else -> 0
+                            }
+                            if (dir == 0) {
+                                dragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                            } else {
+                                dragX.animateTo(-dir * paneWidth, tween(140))        // the old tab slides out…
+                                section = Section.entries[section.ordinal + dir]
+                                dragX.snapTo(dir * paneWidth)
+                                dragX.animateTo(0f, tween(200))                      // …and the new one slides in
+                            }
+                        }
+                    },
+                    onDragCancel = { scope.launch { dragX.animateTo(0f) } },
+                ) { change, dragAmount ->
+                    change.consume()
+                    // A little resistance past the first or last tab
+                    val atEdge = (dragAmount > 0 && section.ordinal == 0) || (dragAmount < 0 && section.ordinal == Section.entries.lastIndex)
+                    scope.launch { dragX.snapTo(dragX.value + if (atEdge) dragAmount * 0.3f else dragAmount) }
+                }
+            }
+            .graphicsLayer { translationX = dragX.value }
+        Column(Modifier.padding(padding).fillMaxSize()) {
             if (isTv) {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(10.dp).background(OnAir, CircleShape))
@@ -678,6 +703,7 @@ private fun HomeScreen(
                 }
             }
 
+            Column(Modifier.weight(1f).fillMaxWidth().then(swipeToTab)) {
             if (section == Section.Guide) {
                 SportGuidePane(
                     channels = sportPicked,
@@ -840,6 +866,7 @@ private fun HomeScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
+            }
             }
         }
     }
