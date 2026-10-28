@@ -30,6 +30,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   send the login.
 - **Continue on phone**: ⋮ → Continue from TV on the phone (or Play here on the phone's remote screen) stops the TV and carries on
   with the same channel on the phone, so only one screen uses the account at a time.
+- **Sound with the screen off** (phone): the channel's sound keeps playing when the screen turns off or you leave the app. A notification shows the channel with a Stop button. ⋮ → Sound with the screen off turns it off, and then a live stream is closed when the app is left.
 - **Auto-reconnect**: a live stream that ends, errors or freezes for 25 s reconnects up to 12 times (1, 2, 4 and 8 s apart, then every 8 s).
 - **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
 - **Swipe between tabs** (phone): drag left or right on the channels: they follow your finger, and when you let go the next or previous tab slides in (All, Sport, Israeli TV, Guide, …).

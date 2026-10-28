@@ -382,6 +382,7 @@ private fun HomeScreen(
     }
     var openLast by remember { mutableStateOf(Resume.enabled(context)) }
     var tileCount by remember { mutableStateOf(TileCount.load(context)) }
+    var backgroundSound by remember { mutableStateOf(BackgroundAudio.enabled(context)) }
 
     fun playLink(link: String) = onPlay(listOf(store.find(link) ?: Channel(link, nameFromUrl(link))), 0, format)
 
@@ -564,6 +565,11 @@ private fun HomeScreen(
                             if (LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Channels on screen: ${tileCount.label}") }, onClick = {
                                     moreMenu = false; tileCount = tileCount.next(); TileCount.save(context, tileCount)
+                                })
+                            }
+                            if (!LocalIsTv.current) {
+                                AppMenuItem(text = { Text("Sound with the screen off: " + if (backgroundSound) "On" else "Off") }, onClick = {
+                                    moreMenu = false; backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound)
                                 })
                             }
                             AppMenuItem(text = { Text("Check for updates") }, onClick = {

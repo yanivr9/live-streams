@@ -1,6 +1,9 @@
 package com.streamdesk.app
 
 import android.annotation.SuppressLint
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.pm.PackageManager
+import android.Manifest
 import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -154,6 +157,7 @@ class PlayerActivity : ComponentActivity() {
     private var reachedReady = false
     private var droppedFrames = 0
     private var pausedByStop = false
+    private var videoOffInBackground = false   // the sound plays on in the background, so the picture was switched off
     private var closedInBackground = false   // a live stream was closed (not just paused) when the app left the screen
 
     // Compose state
@@ -177,6 +181,7 @@ class PlayerActivity : ComponentActivity() {
     private val typedNumber = NumberEntry()
     private val goToTypedNumber = Runnable { commitTypedNumber() }
     private var hasQualities by mutableStateOf(false)
+    private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -198,6 +203,7 @@ class PlayerActivity : ComponentActivity() {
                 /* handleAudioFocus = */ true,
             )
             .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)   // keeps the CPU and Wi-Fi awake while a stream plays with the screen off
             .build()
         // Always start on the best picture the stream and this phone's decoder offer, not whatever the connection speed suggests
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -219,6 +225,13 @@ class PlayerActivity : ComponentActivity() {
             }
         })
 
+        if (!isTv) {
+            // The Stop button on the "playing in the background" notification
+            lifecycleScope.launch { BackgroundAudio.stopRequests.collect { finish() } }
+            if (Build.VERSION.SDK_INT >= 33 && BackgroundAudio.enabled(this) &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         if (isTv) {   // commands from a phone paired with this TV
             lifecycleScope.launch {
                 LinkBus.commands.collect { action ->
@@ -295,6 +308,10 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (videoOffInBackground) {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false).build()
+            videoOffInBackground = false
+        }
         if (pausedByStop) AppLog.i("player", "  app is back on screen; resuming")
         if (pausedByStop && closedInBackground) load() else if (pausedByStop) player.play()
         closedInBackground = false
@@ -306,6 +323,13 @@ class PlayerActivity : ComponentActivity() {
         AppLog.i("player", "  app left the screen (playing=${player.isPlaying}, picture-in-picture=$isInPictureInPictureMode)")
         // Keep playing in picture-in-picture; pause when the app really goes to the background
         if (!isInPictureInPictureMode && player.isPlaying) {
+            if (!isTv && castTarget == null && BackgroundAudio.enabled(this)) {
+                // The sound goes on; the picture isn't needed while nothing is looking at it
+                AppLog.i("player", "  the sound keeps playing in the background")
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+                videoOffInBackground = true
+                return
+            }
             if (liveLike() && castTarget == null) {
                 // A paused live stream still holds its connection, and so uses up one of the account's screens
                 AppLog.i("player", "  closing the live stream because the app is in the background")
@@ -326,6 +350,7 @@ class PlayerActivity : ComponentActivity() {
         bannerHandler.removeCallbacksAndMessages(null)
         typedNumber.clear()
         runCatching { unregisterReceiver(screenReceiver) }
+        stopService(Intent(this, PlaybackService::class.java))
         if (::player.isInitialized) player.release()
         super.onDestroy()
     }
@@ -369,6 +394,7 @@ class PlayerActivity : ComponentActivity() {
         index = i
         val ch = queue[i]
         if (isTv) NowPlaying.set(queue, i)
+        startBackgroundService(ch.displayName())
         current = ch
         retries = 0
         busyRetries = 0
@@ -394,6 +420,13 @@ class PlayerActivity : ComponentActivity() {
         } else {
             load()
         }
+    }
+
+    /** Phone: lets the sound go on with the screen off. Started while the app is on screen, which Android requires. */
+    private fun startBackgroundService(title: String) {
+        if (isTv || castTarget != null || !BackgroundAudio.enabled(this)) return
+        runCatching { ContextCompat.startForegroundService(this, PlaybackService.intent(this, title)) }
+            .onFailure { AppLog.e("player", "Couldn't start the service that keeps the sound on", it) }
     }
 
     private fun load() {
@@ -481,6 +514,7 @@ class PlayerActivity : ComponentActivity() {
                 LinkPrefs.save(this@PlayerActivity, tv.host, code)
                 castTarget = tv
                 castCode = code
+                stopService(Intent(this@PlayerActivity, PlaybackService::class.java))
                 // Stop, don't pause: a paused stream keeps its connection to the provider, which counts as a second screen
                 handler.removeCallbacksAndMessages(null)
                 player.stop()
