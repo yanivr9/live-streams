@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 45
-        versionName = "3.24"
+        versionCode = 46
+        versionName = "3.25"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -25,10 +25,13 @@ android {
     }
 
     buildTypes {
+        // What gets installed: shrunk and optimized, so the app opens and scrolls much faster than a debug build.
+        // Signed with the same key as the debug builds, so it installs over them without uninstalling.
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -70,6 +73,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.google.zxing:core:3.5.3")
+    // Compiles the app's startup code ahead of time when it's installed from a file (no Play Store), for a faster first open
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 }
 
 dependencies {

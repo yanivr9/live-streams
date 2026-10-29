@@ -53,7 +53,8 @@ Requirements: JDK 17+ and the Android SDK (platform 36).
 
 ```sh
 echo "sdk.dir=/path/to/Android/sdk" > local.properties   # or set ANDROID_HOME
-./gradlew assembleDebug          # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease        # → app/build/outputs/apk/release/app-release.apk (what gets installed: optimized, opens fast)
+./gradlew assembleDebug          # → app/build/outputs/apk/debug/app-debug.apk (for development)
 ./gradlew testDebugUnitTest      # playlist parser tests
 ```
 

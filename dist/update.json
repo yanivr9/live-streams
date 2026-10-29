@@ -1,6 +1,6 @@
 {
-  "versionCode": 45,
-  "versionName": "3.24",
+  "versionCode": 46,
+  "versionName": "3.25",
   "apk": "StreamDesk.apk",
-  "notes": "Sport 5 on the Sport tab now plays the Sport 5 FHD channel. The Sport 5 tab is gone."
+  "notes": "Opens much faster: an optimized build, 3 MB instead of 21 MB. Sport 5 plays the Sport 5 FHD channel."
 }
