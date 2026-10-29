@@ -35,8 +35,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 - **Auto-reconnect**: a live stream that ends, errors or freezes for 25 s reconnects up to 12 times (1, 2, 4 and 8 s apart, then every 8 s).
 - **What's on now**: Sport channels show the current program and when it ends, from the IPTV provider's guide.
 - **Swipe between tabs** (phone): drag left or right on the channels: they follow your finger, and when you let go the next or previous tab slides in (All, Sport, Israeli TV, Guide, …).
-- **Quality on this TV**: on a TV the tiles pick Full HD at most, because the Mi Box takes minutes to show a picture on these 4K streams. ⋮ → Quality on this TV switches 4K back on. The Sport 5 tab still lists the 4K versions.
-- **Sport 5 tab**: every Sport 5 channel the provider has (Sport 5, 5+, Live, Stars, Gold, 5+ Max) in every quality, grouped by channel, best quality first.
+- **Quality on this TV**: on a TV the tiles pick Full HD at most, because the Mi Box takes minutes to show a picture on these 4K streams. ⋮ → Quality on this TV switches 4K back on. 
 - **Slow start check**: a channel with no picture after 15 s is tried once more; then the app asks the provider how many screens are in use and says if another screen is playing.
 - **Israeli TV tab**: Channel 11 (Kan), 12, 13, 14 and 15, each with its logo and in the best quality, picked the same way as the Sport list. Channels the account doesn't have are left out.
 - **TV guide**: the Guide tab lists today's and tomorrow's programs on all Sport channels in time order (OK on a program

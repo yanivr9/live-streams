@@ -37,7 +37,26 @@ object DeviceQuality {
  */
 object SportList {
     // "Label = name at the provider" (several names may be separated by "|"). Sport 1–4 and 6 are called "YES SPORT" by this provider.
+    // A name in quotes means exactly that channel, not its best quality: Sport 5 is the provider's "Sport 5 FHD" link.
     val DEFAULT_TEXT = """
+        Sport 1 = YES SPORT 1
+        Sport 2 = YES SPORT 2
+        Sport 3 = YES SPORT 3
+        Sport 4 = YES SPORT 4
+        Sport 5 = "Sport 5 FHD"
+        Sport 5+ = Sport 5+ | Sport 5 Plus
+        Sport 5 Live = Sport 5+ Live
+        Sport 5 Stars = Sport 5+ Stars
+        Sport 5 Gold = Sport 5 Gold | Sport 5+ Gold
+        Sport 5+ Max = Sport 5+ Max
+        Sport 6 = YES SPORT 6
+        ONE 1
+        ONE 2
+    """.trimIndent()
+
+    /** Earlier defaults: a phone that still has one of these (never edited) gets the new default. */
+    val OLD_DEFAULT_TEXTS = listOf(
+        """
         Sport 1 = YES SPORT 1
         Sport 2 = YES SPORT 2
         Sport 3 = YES SPORT 3
@@ -51,10 +70,7 @@ object SportList {
         Sport 6 = YES SPORT 6
         ONE 1
         ONE 2
-    """.trimIndent()
-
-    /** Earlier defaults: a phone that still has one of these (never edited) gets the new default. */
-    val OLD_DEFAULT_TEXTS = listOf(
+        """.trimIndent(),
         """
         Sport 1 = YES SPORT 1
         Sport 2 = YES SPORT 2
@@ -117,6 +133,12 @@ object SportList {
     /** The quality of [channel] if it is the channel [pattern] (in any quality), otherwise null. */
     private fun qualityIfMatches(channel: Channel, pattern: String): Quality? {
         val name = channel.displayName().trim().uppercase()
+        val quoted = pattern.trim()
+        if (quoted.length > 2 && quoted.startsWith('"') && quoted.endsWith('"')) {   // "Sport 5 FHD": that channel only
+            val exact = quoted.substring(1, quoted.length - 1).trim().uppercase()
+            return if (name.split(Regex("\\s+")).joinToString(" ") == exact.split(Regex("\\s+")).joinToString(" "))
+                qualityOf(exact.split(Regex("\\s+")).filter { it in QUALITY_WORDS }) else null
+        }
         val want = pattern.trim().uppercase()
         if (!name.startsWith(want)) return null
         val rest = name.substring(want.length)
@@ -150,38 +172,6 @@ object SportList {
     /** How good the picture is, judging by the channel's name: 5+ is 4K, 4 Full HD, 3 HD, 1 SD, 2 when the name doesn't say. */
     fun qualityScore(channel: Channel): Double =
         qualityOf(channel.displayName().trim().uppercase().split(Regex("\\s+")).filter { it in QUALITY_WORDS }).score
-
-    private const val SPORT5_LOGO = "sport5"
-
-    /**
-     * The Sport 5 tab: every Sport 5 channel the provider has, in every quality, grouped by channel
-     * (Sport 5, 5+, Live, Stars, Gold, Max) and best quality first.
-     */
-    fun sport5All(channels: List<Channel>): List<Channel> {
-        val families = listOf("", "PLUS", "LIVE", "STARS", "GOLD", "MAX")
-        val familyLogos = mapOf("" to SPORT5_LOGO, "PLUS" to "sport5plus", "LIVE" to "sport5live", "STARS" to "sport5stars")
-        val name = Regex("""^SPORT 5(\+)?(?=\s|$)(.*)$""")
-        return channels.mapNotNull { c ->
-            val m = name.find(c.displayName().trim().uppercase()) ?: return@mapNotNull null
-            val words = m.groupValues[2].trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-            val named = words.filter { it !in QUALITY_WORDS && it != "PLUS" }   // "Sport 5 Plus" and "Sport 5+ Plus" are Sport 5+
-            val family = when {
-                named.isEmpty() -> if (m.groupValues[1].isNotEmpty() || "PLUS" in words) "PLUS" else ""
-                named.size == 1 && named[0] in families -> named[0]
-                else -> return@mapNotNull null
-            }
-            Triple(c, family, qualityOf(words.filter { it in QUALITY_WORDS }))
-        }
-            .sortedWith(compareBy({ (_, family, _) -> families.indexOf(family) }, { (_, _, q) -> -q.score }))
-            .map { (c, family, q) ->
-                // The provider's own name ("Sport 5+ UHD 4K"), so versions of the same quality can be told apart
-                c.copy(
-                    name = c.displayName(),
-                    group = q.label.ifEmpty { "Sport 5" },
-                    logo = familyLogos[family]?.let { "$LOGO_DIR$it.png" } ?: c.logo,
-                )
-            }
-    }
 
     /** One channel per line of the list, in that order, each in the best quality [SportSettings.cap] allows. */
     fun pick(channels: List<Channel>, settings: SportSettings): List<Channel> {

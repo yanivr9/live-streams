@@ -1,6 +1,6 @@
 {
-  "versionCode": 44,
-  "versionName": "3.23",
+  "versionCode": 45,
+  "versionName": "3.24",
   "apk": "StreamDesk.apk",
-  "notes": "The TV opens on the channels instead of the last channel. Also: Full HD on the TV instead of 4K."
+  "notes": "Sport 5 on the Sport tab now plays the Sport 5 FHD channel. The Sport 5 tab is gone."
 }

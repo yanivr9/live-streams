@@ -32,8 +32,8 @@ class SportListTest {
         val picked = pick(QualityCap.Best).associateBy { it.name }
         assertEquals(urlOf("IL: YES SPORT 1 FHD"), picked.getValue("Sport 1").url)
         assertEquals(urlOf("IL: YES SPORT 2 FHD"), picked.getValue("Sport 2").url)
-        assertEquals(urlOf("IL: Sport 5 4K HDR"), picked.getValue("Sport 5").url)   // not "Sport 5+", Gold, Plus…
-        assertEquals("4K HDR", picked.getValue("Sport 5").group)
+        assertEquals(urlOf("IL: Sport 5 FHD"), picked.getValue("Sport 5").url)   // exactly "Sport 5 FHD", as the list says
+        assertEquals("Full HD", picked.getValue("Sport 5").group)
         assertEquals(urlOf("IL: ONE 1 4K"), picked.getValue("ONE 1").url)
         assertEquals(urlOf("IL: ONE 2 FHD"), picked.getValue("ONE 2").url)
     }
@@ -62,12 +62,12 @@ class SportListTest {
     @Test
     fun qualityLimitIsRespected() {
         val fullHd = pick(QualityCap.FullHd).associateBy { it.name }
-        assertEquals(urlOf("IL: Sport 5 FHD P50"), fullHd.getValue("Sport 5").url)
+        assertEquals(urlOf("IL: Sport 5 FHD"), fullHd.getValue("Sport 5").url)
         assertEquals(urlOf("IL: ONE 1 FHD P50"), fullHd.getValue("ONE 1").url)
         val hd = pick(QualityCap.Hd).associateBy { it.name }
         assertEquals(urlOf("IL: YES SPORT 1 HD"), hd.getValue("Sport 1").url)
         assertEquals(urlOf("IL: ONE 1 HD"), hd.getValue("ONE 1").url)
-        assertEquals(urlOf("IL: Sport 5 HD"), hd.getValue("Sport 5").url)
+        assertEquals(urlOf("IL: Sport 5 FHD"), hd.getValue("Sport 5").url)       // a name in quotes is that link, whatever the limit
         assertEquals(urlOf("IL: YES SPORT 6 FHD"), hd.getValue("Sport 6").url)      // only FHD exists: lowest available
     }
 
@@ -76,23 +76,6 @@ class SportListTest {
         val s = SportSettings("Sport 1 = YES SPORT 1\nNo Such Channel\n# comment\n\nONE 2", QualityCap.Best)
         assertEquals(listOf("Sport 1", "ONE 2"), SportList.pick(channels, s).map { it.name })
         assertEquals(channels.size, SportList.pick(channels, SportSettings("  \n", QualityCap.Best)).size)   // all have "Sport" in the folder
-    }
-
-    @Test
-    fun sport5TabShowsEveryVariantGroupedBestFirst() {
-        fun ch(name: String) = Channel("http://h/live/u/p/${name.hashCode()}.ts", name, "Hebrew - Sport")
-        val names = listOf(
-            "IL: Sport 5 HD", "IL: Sport 5 4K HDR", "IL: Sport 5+ Live FHD", "IL: Sport 5 Gold", "IL: Sport 5+ Gold 4K",
-            "IL: Sport 5+ Max FHD", "IL: Sport 5+ Plus 4K", "IL: Sport 5 Plus", "IL: Sport 5+ Stars HD", "IL: Sport 50", "IL: Sport 5 Extra",
-        )
-        val all = SportList.sport5All(names.map(::ch))
-        assertEquals(
-            listOf(
-                "Sport 5 4K HDR", "Sport 5 HD", "Sport 5+ Plus 4K", "Sport 5 Plus", "Sport 5+ Live FHD", "Sport 5+ Stars HD",
-                "Sport 5+ Gold 4K", "Sport 5 Gold", "Sport 5+ Max FHD",
-            ),
-            all.map { it.name },
-        )
     }
 
     @Test
@@ -108,12 +91,19 @@ class SportListTest {
     @Test
     fun aTvLimitedToFullHdNeverPicks4K() {
         val tv = SportList.pick(channels, SportList.DEFAULT.limitedTo(QualityCap.FullHd)).associateBy { it.name }
-        assertEquals(urlOf("IL: Sport 5 FHD P50"), tv.getValue("Sport 5").url)
+        assertEquals(urlOf("IL: Sport 5 FHD"), tv.getValue("Sport 5").url)
         assertEquals(urlOf("IL: ONE 1 FHD P50"), tv.getValue("ONE 1").url)
         assertEquals(true, tv.values.none { it.group.startsWith("4K") })
         // A stricter list limit stays as it is
         assertEquals(QualityCap.Hd, SportSettings("", QualityCap.Hd).limitedTo(QualityCap.FullHd).cap)
         assertEquals(5.5, SportList.qualityScore(Channel("http://x", "IL: Sport 5 4K HDR")), 0.0)
         assertEquals(4.0, SportList.qualityScore(Channel("http://x", "IL: Sport 5 FHD")), 0.0)
+    }
+
+    @Test
+    fun aQuotedNameMeansExactlyThatChannel() {
+        val list = SportList.pick(channels, SportSettings("Sport 5 = \"Sport 5 HD\"", QualityCap.Best))
+        assertEquals(listOf(urlOf("IL: Sport 5 HD")), list.map { it.url })
+        assertEquals(emptyList<Channel>(), SportList.pick(channels, SportSettings("X = \"Sport 5\"", QualityCap.Best)))   // no channel is called just "Sport 5"
     }
 }
