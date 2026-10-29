@@ -2,6 +2,7 @@ package com.streamdesk.app
 
 import android.content.Context
 import android.content.Intent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -139,6 +140,7 @@ class MainActivity : ComponentActivity() {
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()   // the logo shows straight away while the app starts
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val store = ChannelStore.get(this)
