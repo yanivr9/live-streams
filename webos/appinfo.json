@@ -1,0 +1,15 @@
+{
+  "id": "com.streamdesk.tv",
+  "version": "1.0.0",
+  "vendor": "Stream Desk",
+  "type": "web",
+  "main": "index.html",
+  "title": "Stream Desk",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0E1113",
+  "splashBackground": "splash.png",
+  "disableBackHistoryAPI": true,
+  "resolution": "1920x1080",
+  "requiredACG": []
+}

@@ -47,6 +47,10 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 
 Not supported: UDP/RTP multicast, SRT, MMS and DRM-protected streams.
 
+## LG TV without the Mi Box
+
+`webos/` is a separate LG webOS app with the essentials (sign-in, Sport and Israeli TV tabs, what's on now, the player and the Magic Remote). The installable file is `dist/webos/com.streamdesk.tv_<version>_all.ipk`; see `webos/README.md` for installing it with Developer Mode.
+
 ## Build
 
 Requirements: JDK 17+ and the Android SDK (platform 36).

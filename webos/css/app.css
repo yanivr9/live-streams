@@ -1,0 +1,68 @@
+/* Sizes are in vw/vh so the app looks the same whether the TV runs it at 1280×720 or 1920×1080.
+   webOS 4 (2018) runs Chrome 53: no CSS grid, no flexbox gap, no inset, so margins and floats do the spacing. */
+:root {
+  --bg: #0E1113;
+  --card: #1B2226;
+  --card-logo: #262F34;
+  --text: #ECEFF1;
+  --soft: #C4CDD2;
+  --amber: #FF9F1C;
+  --onair: #FF4D4D;
+  --ink: #0E1113;        /* text on the white highlight */
+  --ink-soft: #3A444A;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: "LG Smart UI", Roboto, Arial, sans-serif; overflow: hidden; }
+.hidden { display: none !important; }
+.screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+
+header { display: flex; align-items: center; height: 9vh; padding: 0 2.5vw; }
+header > * { margin-right: 1.2vw; }
+.onair { width: 0.9vw; height: 0.9vw; border-radius: 50%; background: var(--onair); }
+.title { font-size: 2vw; font-weight: 600; margin-right: 2vw; }
+#tabs { display: flex; flex: 1; }
+.tab { margin-right: 0.6vw; }
+.tab { font-size: 1.5vw; padding: 0.6vh 1.3vw; border-radius: 999px; color: var(--soft); border: 0.15vw solid transparent; }
+.tab.selected { color: var(--amber); border-color: var(--amber); }
+.tab.focused, .focusable.focused { background: #fff; color: var(--ink); border-color: #fff; }
+#clock { font-size: 1.6vw; color: var(--soft); font-variant-numeric: tabular-nums; }
+
+/* 4 tiles across, 3 rows on the screen (12 at a time); the grid scrolls by rows */
+#grid { position: absolute; top: 10vh; left: 2.5vw; right: 1vw; bottom: 0; overflow: hidden; }
+.tile {
+  float: left; width: 22vw; height: 27vh; margin: 0 1.5vw 2vh 0;
+  background: var(--card); border-radius: 1vw; padding: 1vw; display: flex; flex-direction: column;
+}
+.tile .logo { flex: 1; background: var(--card-logo); border-radius: 0.6vw; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.tile .logo img { max-width: 92%; max-height: 88%; object-fit: contain; }
+.tile .logo .num { font-family: monospace; font-size: 2.4vw; color: var(--soft); }
+.tile .name { font-size: 1.45vw; font-weight: 600; margin-top: 0.8vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .now { font-size: 1.1vw; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.4em; }
+.tile.focused { background: #fff; }
+.tile.focused .name { color: var(--ink); }
+.tile.focused .now { color: var(--ink-soft); }
+
+.message { position: absolute; top: 40vh; left: 10vw; right: 10vw; text-align: center; font-size: 1.8vw; color: var(--soft); line-height: 1.5; }
+
+#settings { padding: 6vh 8vw; }
+#settings h1 { font-size: 2.6vw; margin: 0 0 1vh; }
+.hint { color: var(--soft); font-size: 1.3vw; margin: 0 0 3vh; }
+.form { max-width: 60vw; }
+.form > * { margin-bottom: 2vh; }
+.form label { display: block; font-size: 1.3vw; color: var(--soft); }
+.form label input { display: block; width: 100%; margin-top: 0.6vh; }
+.form input { font-size: 1.7vw; padding: 1vh 1vw; border-radius: 0.6vw; border: 0.2vw solid #3A444A; background: var(--card); color: var(--text); }
+.form input.focused { border-color: #fff; outline: none; }
+.row { display: flex; }
+.row button { margin-right: 1.2vw; }
+button { font-size: 1.5vw; padding: 1.2vh 2vw; border-radius: 999px; border: 0.15vw solid #3A444A; background: transparent; color: var(--text); }
+button.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+.error { color: #FF8A80; font-size: 1.4vw; min-height: 1.5em; }
+
+#player { background: #000; }
+#video { width: 100%; height: 100%; background: #000; }
+.banner { position: absolute; top: 5vh; left: 3vw; max-width: 70vw; background: rgba(0, 0, 0, 0.75); border-radius: 0.8vw; padding: 1.5vh 1.5vw; font-size: 1.8vw; }
+.banner .sub { font-size: 1.3vw; color: var(--soft); margin-top: 0.5vh; }
+.status { position: absolute; top: 45vh; left: 50%; transform: translateX(-50%); background: rgba(27, 34, 38, 0.92); border-radius: 1vw; padding: 2vh 2.5vw; font-size: 1.7vw; text-align: center; max-width: 70vw; }
+.status.error { color: #FF8A80; }

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stream Desk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <!-- Channels -->
+  <div id="home" class="screen">
+    <header>
+      <span class="onair"></span>
+      <span class="title">Stream Desk</span>
+      <nav id="tabs"></nav>
+      <span id="clock"></span>
+    </header>
+    <div id="message" class="message hidden"></div>
+    <div id="grid"></div>
+  </div>
+
+  <!-- Sign-in and settings -->
+  <div id="settings" class="screen hidden">
+    <h1>Sign in to your IPTV account</h1>
+    <p class="hint">Use the remote: OK opens the keyboard, Back closes it. The same details as in the phone app.</p>
+    <div class="form">
+      <label>Server address<input id="f-server" type="url" placeholder="http://server:8080" autocomplete="off"></label>
+      <label>Username<input id="f-user" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label>Password<input id="f-pass" type="password" autocomplete="off"></label>
+      <label>Folders<input id="f-folders" type="text" placeholder="Hebrew" autocomplete="off"></label>
+      <div class="row">
+        <button id="b-quality" class="focusable"></button>
+      </div>
+      <div class="row">
+        <button id="b-save" class="focusable primary">Sign in</button>
+        <button id="b-cancel" class="focusable">Back</button>
+        <button id="b-signout" class="focusable">Sign out</button>
+      </div>
+      <p id="f-error" class="error"></p>
+    </div>
+  </div>
+
+  <!-- Player -->
+  <div id="player" class="screen hidden">
+    <video id="video" autoplay></video>
+    <div id="banner" class="banner hidden"></div>
+    <div id="status" class="status hidden"></div>
+  </div>
+
+  <script src="js/lists.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
