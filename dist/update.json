@@ -1,6 +1,6 @@
 {
-  "versionCode": 48,
-  "versionName": "3.27",
+  "versionCode": 49,
+  "versionName": "3.28",
   "apk": "StreamDesk.apk",
-  "notes": "Opens faster on TV boxes, and no longer asks to install other apps (Play Protect blocked that). New versions are announced; install them like before."
+  "notes": "A new look on the TV: the selected channel glows, bigger logos, and all tabs fit on the screen."
 }

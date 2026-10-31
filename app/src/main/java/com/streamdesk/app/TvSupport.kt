@@ -91,7 +91,9 @@ class NumberEntry(private val maxDigits: Int = 3) {
 /** The selected row on a TV is solid white, so its text and icons turn near-black. */
 val FocusInk = Color(0xFF0E1113)
 val FocusInkSoft = Color(0xFF3A444A)
-val FocusAmberDark = Color(0xFFA65F00)   // the amber of the favorite star and "now playing", dark enough on white
+val FocusAmberDark = Color(0xFFA65F00)
+/** A TV tile the remote is on: a shade lighter than the others, inside its white glow. */
+val FocusCard = Color(0xFF26313A)   // the amber of the favorite star and "now playing", dark enough on white
 
 /** Menu entry: on a TV it turns solid white when the remote is on it; on a phone it's the usual menu item. */
 @Composable

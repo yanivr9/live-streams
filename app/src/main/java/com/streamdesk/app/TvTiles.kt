@@ -2,7 +2,18 @@ package com.streamdesk.app
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +46,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -87,14 +97,24 @@ fun ChannelTile(
             heldOpen = false
         }
     }
-    val shape = RoundedCornerShape(12.dp)
-    val ink = if (focused) FocusInk else MaterialTheme.colorScheme.onSurface
-    val soft = if (focused) FocusInkSoft else MaterialTheme.colorScheme.onSurfaceVariant
+    val shape = RoundedCornerShape(14.dp)
+    val ink = MaterialTheme.colorScheme.onSurface
+    val soft = MaterialTheme.colorScheme.onSurfaceVariant
+    // "Glow": the tile the remote is on stays dark, grows a little and gets a white frame with a soft white glow
+    val scale by animateFloatAsState(if (focused) 1.07f else 1f, label = "tile scale")
     val hasLogo = channel.logo.startsWith("http") || channel.logo.startsWith("file:///android_asset/")
 
     Box(
         modifier
             .fillMaxWidth()
+            .zIndex(if (focused) 1f else 0f)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(
+                if (focused) Modifier
+                    .shadow(20.dp, shape, ambientColor = Color.White, spotColor = Color.White)
+                    .border(3.dp, Color.White, shape)
+                else Modifier
+            )
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { e ->
                 val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
@@ -104,12 +124,12 @@ fun ChannelTile(
                     true
                 } else false
             }
-            .background(if (focused) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.surfaceContainer, shape)
+            .background(if (focused) FocusCard else MaterialTheme.colorScheme.surfaceContainer, shape)
             .clip(shape)
-            .clickable { if (heldOpen) heldOpen = false else onClick() }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (heldOpen) heldOpen = false else onClick() }
             .padding(10.dp),
     ) {
-        Column(if (fillHeight) Modifier.fillMaxSize() else Modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(if (fillHeight) Modifier.fillMaxSize() else Modifier) {
             Box(
                 (if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(84.dp)).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
@@ -131,7 +151,7 @@ fun ChannelTile(
                         model = channel.logo,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().padding(6.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
                         onSuccess = { logoShown = true },
                         onError = { logoShown = false },
                     )
@@ -141,10 +161,9 @@ fun ChannelTile(
                 channel.displayName(),
                 color = ink,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                minLines = 2,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp),
             )
             val detail = if (channel.source.isNotEmpty() || channel.url.isBlank()) channel.group else channel.group.ifBlank { "" }
@@ -160,7 +179,7 @@ fun ChannelTile(
             Icon(
                 Icons.Default.Star,
                 contentDescription = "Favorite",
-                tint = if (focused) FocusAmberDark else Amber,
+                tint = Amber,
                 modifier = Modifier.align(Alignment.TopEnd).size(22.dp),
             )
         }
@@ -171,6 +190,42 @@ fun ChannelTile(
             else AppMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })
             AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy() })
             AppMenuItem(text = { Text(removeLabel) }, onClick = { menu = false; onRemove() })
+        }
+    }
+}
+
+/**
+ * The TV's tabs: the chosen one is an orange pill, the one the remote is on gets the same white glow frame as a tile.
+ * Scrolls by itself so the chosen tab is always in view.
+ */
+@Composable
+fun TvTabBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val list = rememberLazyListState()
+    LaunchedEffect(selected) { list.animateScrollToItem((selected - 1).coerceAtLeast(0)) }
+    LazyRow(modifier, state = list, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        itemsIndexed(labels) { i, label ->
+            var focused by remember { mutableStateOf(false) }
+            val pill = RoundedCornerShape(50)
+            val chosen = i == selected
+            Box(
+                Modifier
+                    .padding(vertical = 6.dp)
+                    .then(if (focused) Modifier.shadow(12.dp, pill, ambientColor = Color.White, spotColor = Color.White).border(2.dp, Color.White, pill) else Modifier)
+                    .background(if (chosen) Amber else if (focused) FocusCard else Color.Transparent, pill)
+                    .clip(pill)
+                    .onFocusChanged { focused = it.isFocused }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(i) }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    label,
+                    color = if (chosen) FocusInk else if (focused) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
     }
 }

@@ -676,22 +676,16 @@ private fun HomeScreen(
             .graphicsLayer { translationX = dragX.value }
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (isTv) {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Just the red dot, not the name: the TV's width is needed for all the tabs
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(10.dp).background(OnAir, CircleShape))
-                    Spacer(Modifier.width(10.dp))
-                    Text("Stream Desk", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.width(14.dp))
-                    ScrollableTabRow(
-                        selectedTabIndex = section.ordinal,
+                    Spacer(Modifier.width(12.dp))
+                    TvTabBar(
+                        labels = Section.entries.map { it.label },
+                        selected = section.ordinal,
+                        onSelect = { section = Section.entries[it] },
                         modifier = Modifier.weight(1f),
-                        containerColor = Color.Transparent,
-                        edgePadding = 0.dp,
-                        divider = {},
-                    ) {
-                        Section.entries.forEach { s ->
-                            Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
-                        }
-                    }
+                    )
                     IconButton(onClick = { dialog = HomeDialog.Search }) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
                     topActions()
                 }
