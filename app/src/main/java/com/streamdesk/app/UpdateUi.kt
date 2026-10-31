@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,8 +73,19 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
                     if (info.notes.isNotBlank()) {
                         Text(info.notes, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
                     }
-                    val how = message ?: if (isTv) "Install it on this TV box the same way as the first time." else null
+                    val how = message ?: if (isTv) "To install it, open the Downloader app and enter:" else null
                     how?.let { Text(it, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp)) }
+                    if (isTv && message == null) {
+                        // The address to type in Downloader, large enough to read from the couch
+                        Text(
+                            Updates.SHORT_DOWNLOAD,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                     Spacer(Modifier.height(28.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         if (isTv) {
@@ -108,5 +120,6 @@ private fun TvButton(text: String, onClick: () -> Unit, modifier: Modifier = Mod
             containerColor = if (focused) Color.White else FocusCard,
             contentColor = if (focused) FocusInk else Color.White,
         ),
-    ) { Text(text, fontWeight = FontWeight.SemiBold) }
+        contentPadding = PaddingValues(horizontal = 36.dp, vertical = 12.dp),
+    ) { Text(text, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium) }
 }
