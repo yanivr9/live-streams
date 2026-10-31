@@ -131,7 +131,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -200,6 +200,9 @@ class MainActivity : ComponentActivity() {
         startActivity(PlayerActivity.intent(this, queue.subList(from, to), index - from, format))
     }
 }
+
+/** How long work the first screen doesn't need (guide, list refresh, update check) waits after the app opens. */
+private const val STARTUP_QUIET_MS = 1_500L
 
 private enum class Section(val label: String) {
     All("All"), Sport("Sport"), Israel("Israeli TV"), Guide("Guide"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
@@ -311,6 +314,7 @@ private fun HomeScreen(
 
     // Keep playlists current, each on its own schedule
     LaunchedEffect(Unit) {
+        delay(STARTUP_QUIET_MS)   // let the first screen draw before refreshing lists (slow TV boxes)
         val now = System.currentTimeMillis()
         store.sources.value
             .filter { it.enabled && it.updateHours > 0 && it.updatedAt < now - it.updateHours * DAY_MS / 24 }
@@ -392,6 +396,7 @@ private fun HomeScreen(
     LaunchedEffect(invite) { invite?.let { dialog = HomeDialog.Invite(it) } }
     // A new version, if there is one: ask once when the app opens
     LaunchedEffect(Unit) {
+        delay(STARTUP_QUIET_MS * 2)
         val found = runCatching { Updates.check(context) }.getOrNull()
         if (found != null && dialog == null) dialog = HomeDialog.Update(found)
     }
@@ -465,6 +470,7 @@ private fun HomeScreen(
     // What's on now, from the provider's guide; refreshed every few minutes
     var guide by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     LaunchedEffect(sportPicked, israelPicked, sources) {
+        if (guide.isEmpty()) delay(STARTUP_QUIET_MS)
         while (true) {
             val next = HashMap<String, String>()
             for (ch in sportPicked + israelPicked) {
@@ -1292,17 +1298,19 @@ private fun ChannelBadge(channel: Channel, number: Int?) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // The number shows until the logo arrives (or for good if there is none); a plain AsyncImage is cheaper than
+        // SubcomposeAsyncImage, which matters when a screenful of rows is drawn at once
+        var logoShown by remember(channel.logo) { mutableStateOf(false) }
+        if (!logoShown) numberText()
         if (hasLogo) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = channel.logo,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize().padding(3.dp),
-                loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { numberText() } },
-                error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { numberText() } },
+                onSuccess = { logoShown = true },
+                onError = { logoShown = false },
             )
-        } else {
-            numberText()
         }
     }
 }

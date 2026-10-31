@@ -38,7 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
 /** How many channel tiles fit on the first TV screen: the columns and rows are chosen so they fill it. */
@@ -122,17 +122,19 @@ fun ChannelTile(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // The number shows until the logo arrives (or for good if there is none); a plain AsyncImage is much
+                // cheaper than SubcomposeAsyncImage, which matters for drawing the first screen on a slow TV box
+                var logoShown by remember(channel.logo) { mutableStateOf(false) }
+                if (!logoShown) numberText()
                 if (hasLogo) {
-                    SubcomposeAsyncImage(
+                    AsyncImage(
                         model = channel.logo,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().padding(6.dp),
-                        loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { numberText() } },
-                        error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { numberText() } },
+                        onSuccess = { logoShown = true },
+                        onError = { logoShown = false },
                     )
-                } else {
-                    numberText()
                 }
             }
             Text(

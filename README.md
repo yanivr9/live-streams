@@ -42,7 +42,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   that's on now plays it). Each IPTV channel's menu also has "TV guide" for its full schedule.
 - **Channels on screen** (TV): the home screen opens with 12 channel tiles (4 × 3) that fill the screen. ⋮ → Channels on screen cycles 6 / 9 / 12 / 15 / 20.
 - **Open on last channel** (TV): off by default, so the app opens on its channels. ⋮ → Open on last channel turns it on.
-- **Updates in the app**: ⋮ → Check for updates (and once when the app opens). It reads `dist/update.json` from the repo, shows a full-screen "A new version is ready" page, downloads the APK with a progress bar and opens Android's installer. `scripts/release.sh` publishes a build there. The link must be reachable without signing in, so the repo has to be public; see `Updates.UPDATE_URL`.
+- **New version notice**: ⋮ → Check for updates (and once when the app opens) reads `dist/update.json` from the repo and says when there's a newer version; on a phone, Download opens it in the browser. The app doesn't install anything itself (no install-other-apps permission), because Play Protect blocks such apps on TV boxes. `scripts/release.sh` publishes a build there. The link must be reachable without signing in, so the repo has to be public.
 - Opens stream links shared from other apps or tapped in a browser, and `.m3u` files from a file manager.
 
 Not supported: UDP/RTP multicast, SRT, MMS and DRM-protected streams.

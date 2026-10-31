@@ -3,22 +3,17 @@ package com.streamdesk.app
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
-import java.net.HttpURLConnection
 import java.net.URL
 
 /** A newer version of the app: what the update file says. */
 data class UpdateInfo(val code: Int, val name: String, val apkUrl: String, val notes: String)
 
 /**
- * Updates from inside the app. The app reads a small file (`update.json`) and, when it names a newer version,
- * downloads the APK and hands it to Android's installer. Android asks for one confirmation before installing,
- * and only accepts an APK signed with the same key as the installed app.
+ * "A new version is available". The app reads a small file (`update.json`) and, when it names a newer version, says so
+ * and offers the download link; installing stays with the browser and Android's installer, as for the first install.
  */
 object Updates {
     const val UPDATE_URL = "https://raw.githubusercontent.com/yanivr9/live-streams/main/dist/update.json"
@@ -46,56 +41,12 @@ object Updates {
         info.takeIf { isNewer(it, installedCode(context)) }
     }
 
-    suspend fun download(context: Context, info: UpdateInfo, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "updates").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-        val file = File(dir, "StreamDesk-${info.name}.apk")
-        val conn = URL(info.apkUrl).openConnection() as HttpURLConnection
-        conn.connectTimeout = 15_000
-        conn.readTimeout = 30_000
-        conn.instanceFollowRedirects = true
-        try {
-            if (conn.responseCode !in 200..299) throw IllegalStateException("The server answered ${conn.responseCode}.")
-            val total = conn.contentLengthLong
-            var done = 0L
-            conn.inputStream.use { input ->
-                file.outputStream().use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        done += n
-                        if (total > 0) onProgress((done * 100 / total).toInt())
-                    }
-                }
-            }
-            if (total > 0 && done != total) throw IllegalStateException("The download was cut off.")
-        } catch (e: Exception) {
-            file.delete()
-            throw e
-        } finally {
-            conn.disconnect()
-        }
-        file
-    }
-
-    /** Opens Android's installer. Returns false when the app first needs permission to install apps. */
-    fun install(context: Context, apk: File): Boolean {
-        if (!context.packageManager.canRequestPackageInstalls()) {
-            runCatching {
-                context.startActivity(
-                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-            }
-            return false
-        }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", apk)
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-        return true
-    }
+    /**
+     * Opens the new version's download link in the browser (phones). The app doesn't install anything itself: an app that
+     * can install other apps is what Play Protect blocks on boxes like the Mi Box. Returns false when there's no browser (TVs).
+     */
+    fun openDownload(context: Context, info: UpdateInfo): Boolean =
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess
 }

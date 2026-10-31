@@ -1,6 +1,6 @@
 {
-  "versionCode": 47,
-  "versionName": "3.26",
+  "versionCode": 48,
+  "versionName": "3.27",
   "apk": "StreamDesk.apk",
-  "notes": "Shows the Stream Desk logo straight away while the app opens."
+  "notes": "Opens faster on TV boxes, and no longer asks to install other apps (Play Protect blocked that). New versions are announced; install them like before."
 }
