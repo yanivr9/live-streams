@@ -36,6 +36,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,7 +66,17 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            // On a TV, OK anywhere on this page closes it, whatever has the remote's focus
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onPreviewKeyEvent { e ->
+                        val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
+                        if (isTv && ok && e.type == KeyEventType.KeyUp) { onDismiss(); true } else false
+                    }
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Column(
                     Modifier.widthIn(max = 560.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
