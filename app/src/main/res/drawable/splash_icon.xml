@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The splash screen logo: a TV screen with the orange play button and the red "on air" light.
+     Everything stays inside the centre circle (radius 36 of 108) that Android 12+ shows of a splash icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Screen -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#ECEFF1"
+        android:strokeWidth="4"
+        android:pathData="M33,37 L75,37 Q79,37 79,41 L79,65 Q79,69 75,69 L33,69 Q29,69 29,65 L29,41 Q29,37 33,37 Z" />
+    <!-- Stand -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#ECEFF1"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M45,77 L63,77" />
+    <!-- Play button -->
+    <path
+        android:fillColor="#FF9F1C"
+        android:strokeColor="#FF9F1C"
+        android:strokeWidth="3"
+        android:strokeLineJoin="round"
+        android:pathData="M49,46 L62,53 L49,60 Z" />
+    <!-- On-air light -->
+    <path
+        android:fillColor="#FF4D4D"
+        android:pathData="M74,31 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0" />
+</vector>

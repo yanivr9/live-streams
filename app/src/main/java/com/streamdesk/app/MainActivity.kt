@@ -2,6 +2,7 @@ package com.streamdesk.app
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.net.Uri
 import android.os.Bundle
@@ -140,7 +141,9 @@ class MainActivity : ComponentActivity() {
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()   // the logo shows straight away while the app starts
+        // The logo shows straight away while the app starts, and stays long enough to be seen
+        val shownAt = SystemClock.uptimeMillis()
+        installSplashScreen().setKeepOnScreenCondition { SystemClock.uptimeMillis() - shownAt < SPLASH_MIN_MS }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val store = ChannelStore.get(this)
@@ -200,6 +203,9 @@ class MainActivity : ComponentActivity() {
         startActivity(PlayerActivity.intent(this, queue.subList(from, to), index - from, format))
     }
 }
+
+/** The shortest time the logo stays on screen when the app opens. */
+private const val SPLASH_MIN_MS = 700L
 
 /** How long work the first screen doesn't need (guide, list refresh, update check) waits after the app opens. */
 private const val STARTUP_QUIET_MS = 1_500L

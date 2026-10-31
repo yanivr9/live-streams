@@ -1,6 +1,6 @@
 {
-  "versionCode": 50,
-  "versionName": "3.29",
+  "versionCode": 51,
+  "versionName": "3.30",
   "apk": "StreamDesk.apk",
-  "notes": "On the TV, the button on the new-version screen is highlighted in white instead of yellow."
+  "notes": "A clear Stream Desk logo when the app opens."
 }
