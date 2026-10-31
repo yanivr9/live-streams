@@ -1,6 +1,6 @@
 {
-  "versionCode": 49,
-  "versionName": "3.28",
+  "versionCode": 50,
+  "versionName": "3.29",
   "apk": "StreamDesk.apk",
-  "notes": "A new look on the TV: the selected channel glows, bigger logos, and all tabs fit on the screen."
+  "notes": "On the TV, the button on the new-version screen is highlighted in white instead of yellow."
 }

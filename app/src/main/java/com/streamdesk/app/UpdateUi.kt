@@ -1,5 +1,9 @@
 package com.streamdesk.app
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,7 +77,7 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
                     Spacer(Modifier.height(28.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         if (isTv) {
-                            Button(onClick = onDismiss, modifier = Modifier.focusRequester(mainFocus)) { Text("OK") }
+                            TvButton("OK", onClick = onDismiss, modifier = Modifier.focusRequester(mainFocus))
                         } else {
                             OutlinedButton(onClick = onDismiss) { Text("Later") }
                             Button(
@@ -89,4 +93,20 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+/** A button on the TV: dark until the remote is on it, then white with dark text, like the white glow on the tiles. */
+@Composable
+private fun TvButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        interactionSource = interaction,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (focused) Color.White else FocusCard,
+            contentColor = if (focused) FocusInk else Color.White,
+        ),
+    ) { Text(text, fontWeight = FontWeight.SemiBold) }
 }
