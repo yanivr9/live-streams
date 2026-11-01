@@ -48,6 +48,10 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 
 Not supported: UDP/RTP multicast, SRT, MMS and DRM-protected streams.
 
+## Windows PC
+
+`desktop/` is a Windows program with the same screens as the LG app (it reuses `webos/`), for keyboard and mouse. See `desktop/README.md`.
+
 ## LG TV without the Mi Box
 
 `webos/` is a separate LG webOS app with the essentials (sign-in, Sport and Israeli TV tabs, what's on now, the player and the Magic Remote). The installable file is `dist/webos/com.streamdesk.tv_<version>_all.ipk`; see `webos/README.md` for installing it with Developer Mode.

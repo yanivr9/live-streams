@@ -8,7 +8,7 @@
   'use strict';
 
   var KEY = {
-    LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27,
+    LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27, BACKSPACE: 8,
     CH_UP: 33, CH_DOWN: 34, STOP: 413, FF: 417, RW: 412
   };
   var COLUMNS = 4;
@@ -26,6 +26,8 @@
   ];
 
   function $(id) { return document.getElementById(id); }
+  // On a PC (desktop/), a player library plays the streams; the LG's own video element plays them on the TV
+  var engine = window.DesktopPlayer || null;
   function store(key, value) {
     try {
       if (value === undefined) return JSON.parse(localStorage.getItem(key));
@@ -249,6 +251,24 @@
     });
   }
 
+  // With a mouse (PC) or the Magic Remote's pointer: clicking a field or button does what OK on it does
+  settingsItems.forEach(function (id, i) {
+    $(id).addEventListener('click', function () {
+      settingsFocus = i;
+      refreshSettingsFocus();
+      if ($(id).tagName !== 'INPUT') activateSetting();
+    });
+  });
+
+  // The mouse wheel moves through the channels a row at a time
+  $('grid').addEventListener('wheel', function (e) {
+    if (!visible.length) return;
+    state.zone = 'grid';
+    state.index = Math.max(0, Math.min(visible.length - 1, state.index + (e.deltaY > 0 ? COLUMNS : -COLUMNS)));
+    refreshFocus();
+    e.preventDefault();
+  });
+
   function activateSetting() {
     var id = settingsItems[settingsFocus];
     var el = $(id);
@@ -286,6 +306,7 @@
   }
 
   function closeSettings() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // the keyboard leaves the hidden form
     show('home');
     state.zone = 'grid';
     render();
@@ -321,16 +342,21 @@
   function load() {
     var c = player.list[player.index];
     setStatus('Connecting…');
-    video.src = streamUrl(c, player.ext);
-    video.load();
-    var p = video.play();
-    if (p && p.catch) p.catch(function () { /* errors arrive through the error event */ });
+    if (engine) {
+      engine.load(video, streamUrl(c, player.ext), player.ext, function (reason) { onProblem(reason); });
+    } else {
+      video.src = streamUrl(c, player.ext);
+      video.load();
+      var p = video.play();
+      if (p && p.catch) p.catch(function () { /* errors arrive through the error event */ });
+    }
     clearTimeout(player.timer);
     player.timer = setTimeout(function () { onProblem('no picture after ' + START_TIMEOUT_MS / 1000 + ' s'); }, START_TIMEOUT_MS);
   }
 
   function stopVideo() {
     clearTimeout(player.stallTimer);
+    if (engine) { engine.stop(video); return; }
     video.removeAttribute('src');
     try { video.load(); } catch (e) { /* nothing was loaded */ }
   }
@@ -368,7 +394,12 @@
     clearTimeout(player.stallTimer);
     player.stallTimer = setTimeout(function () { onProblem('frozen'); }, STALL_MS);
   });
-  video.addEventListener('error', function () { if (video.getAttribute('src')) onProblem('the stream stopped'); });
+  video.addEventListener('error', function () { if (!engine && video.getAttribute('src')) onProblem('the stream stopped'); });
+  // Double-click (mouse) switches full screen on and off
+  video.addEventListener('dblclick', function () {
+    if (document.webkitFullscreenElement) document.webkitExitFullscreen();
+    else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
+  });
   video.addEventListener('ended', function () { onProblem('the stream ended'); });
 
   function closePlayer() {
@@ -440,6 +471,8 @@
   document.addEventListener('keydown', function (e) {
     var code = e.keyCode;
     var handled = true;
+    // A PC keyboard's Backspace works as Back, except while typing in a field
+    if (code === KEY.BACKSPACE && !(document.activeElement && document.activeElement.tagName === 'INPUT')) code = KEY.BACK;
 
     if (state.screen === 'player') {
       var d = digitOf(code);
@@ -478,7 +511,7 @@
         else if (code === KEY.RIGHT) state.tabFocus = Math.min(TABS.length - 1, state.tabFocus + 1);
         else if (code === KEY.DOWN && visible.length) state.zone = 'grid';
         else if (code === KEY.OK) { openTab(state.tabFocus); return e.preventDefault(); }
-        else if (code === KEY.BACK || code === KEY.ESC) window.close();   // Back on the tabs leaves the app
+        else if (code === KEY.BACK || code === KEY.ESC) { if (!engine) window.close(); }   // Back on the tabs leaves the TV app; a PC window stays
         else handled = false;
         refreshFocus();
       } else {

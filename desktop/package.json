@@ -1,0 +1,20 @@
+{
+  "name": "stream-desk-desktop",
+  "productName": "Stream Desk",
+  "version": "1.0.0",
+  "description": "Stream Desk for Windows: the TV app's essentials on a PC",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "node build.js && electron .",
+    "dist": "node build.js && electron-packager . \"Stream Desk\" --platform=win32 --arch=x64 --out=out --overwrite --ignore=\"^/out\" --ignore=\"^/node_modules/(?!hls|mpegts)\""
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "@electron/packager": "18.3.6"
+  },
+  "dependencies": {
+    "hls.js": "1.5.17",
+    "mpegts.js": "1.7.3"
+  }
+}
