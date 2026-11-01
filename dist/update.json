@@ -1,6 +1,6 @@
 {
-  "versionCode": 54,
-  "versionName": "3.33",
+  "versionCode": 55,
+  "versionName": "3.34",
   "apk": "StreamDesk.apk",
-  "notes": "Problems are now caught automatically on the phone and the TV, with a one-tap report to send."
+  "notes": "What's on now loads faster and isn't downloaded again every time you open the channels."
 }

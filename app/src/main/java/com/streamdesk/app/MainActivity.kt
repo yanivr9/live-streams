@@ -8,6 +8,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -202,6 +205,21 @@ class MainActivity : ComponentActivity() {
         val from = (index - 100).coerceAtLeast(0)
         val to = (index + 100).coerceAtMost(queue.size)
         startActivity(PlayerActivity.intent(this, queue.subList(from, to), index - from, format))
+    }
+}
+
+/** "What's on now" labels for the whole app session, so they aren't fetched again each time the channels show. */
+private object NowOnCache {
+    const val FRESH_MS = 3 * 60_000L
+    @Volatile private var labels: Map<String, String> = emptyMap()
+    @Volatile private var asked: Set<String> = emptySet()   // the channels the labels were fetched for
+    @Volatile private var at = 0L
+    fun labels(): Map<String, String> = labels
+    /** How long until the labels for these channels need fetching again; 0 if now (stale, or other channels). */
+    fun waitMs(channels: Collection<String>): Long =
+        if (!asked.containsAll(channels)) 0 else (FRESH_MS - (System.currentTimeMillis() - at)).coerceAtLeast(0)
+    fun store(channels: Collection<String>, new: Map<String, String>) {
+        labels = new; asked = channels.toSet(); at = System.currentTimeMillis()
     }
 }
 
@@ -489,19 +507,28 @@ private fun HomeScreen(
         if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
     }
     val israelPicked = remember(scoped, deviceQuality) { IsraelList.pick(scoped, deviceQuality) }
-    // What's on now, from the provider's guide; refreshed every few minutes
-    var guide by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // What's on now, from the provider's guide; refreshed every few minutes. Kept for the whole app session, so coming
+    // back to this screen shows it at once instead of fetching every channel again.
+    var guide by remember { mutableStateOf(NowOnCache.labels()) }
     LaunchedEffect(sportPicked, israelPicked, sources) {
         if (guide.isEmpty()) delay(STARTUP_QUIET_MS)
+        val channels = (sportPicked + israelPicked).distinctBy { it.url }
         while (true) {
-            val next = HashMap<String, String>()
-            for (ch in sportPicked + israelPicked) {
-                val login = sources.firstOrNull { it.url == ch.source }?.xtream ?: continue
-                val programs = runCatching { Epg.load(login, ch.url) }.getOrDefault(emptyList())
-                Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { next[ch.url] = it }
+            delay(NowOnCache.waitMs(channels.map { it.url }))
+            // A few channels at a time instead of one after another: the labels arrive in well under a second
+            val labels = coroutineScope {
+                channels.chunked(6).flatMap { batch ->
+                    batch.map { ch ->
+                        async {
+                            val login = sources.firstOrNull { it.url == ch.source }?.xtream ?: return@async null
+                            val programs = runCatching { Epg.load(login, ch.url) }.getOrDefault(emptyList())
+                            Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { ch.url to it }
+                        }
+                    }.awaitAll()
+                }.filterNotNull().toMap()
             }
-            guide = next
-            delay(3 * 60_000L)
+            NowOnCache.store(channels.map { it.url }, labels)
+            guide = labels
         }
     }
     val groups = remember(scoped, section) {
