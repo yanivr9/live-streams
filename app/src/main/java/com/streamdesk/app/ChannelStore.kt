@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 
 /** Saved channels, playlist links and play history, kept as JSON files in app storage. */
 class ChannelStore private constructor(context: Context) {
+    private val appContext = context.applicationContext
     private val dir = context.filesDir
     // Lists can hold tens of thousands of channels, so files are written off the main thread, in order.
     private val writer = Executors.newSingleThreadExecutor()
@@ -111,6 +112,7 @@ class ChannelStore private constructor(context: Context) {
                 throw e
             } catch (e: Throwable) {
                 AppLog.e("playlist", "Failed: ${describe(e)}", e)
+                Problems.record(appContext, "playlist", "Couldn't load the playlist: ${describe(e)}")
                 if (!quiet) _events.emit(StoreEvent("Couldn't load the playlist: ${describe(e)}."))
             } finally {
                 setProgress(url, null)
@@ -158,6 +160,7 @@ class ChannelStore private constructor(context: Context) {
                 val msg = describe(e)
                 AppLog.e("signin", "Failed: \"${source.name}\": $msg", e)
                 putSource((_sources.value.firstOrNull { it.url == url } ?: source).copy(error = msg))
+                Problems.record(appContext, "sign-in", "Couldn't sign in: $msg")
                 if (!quiet) _events.emit(StoreEvent("Couldn't sign in: $msg."))
             } finally {
                 setProgress(url, null)

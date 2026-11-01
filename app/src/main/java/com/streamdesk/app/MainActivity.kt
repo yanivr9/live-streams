@@ -104,6 +104,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
@@ -234,6 +235,7 @@ private sealed interface HomeDialog {
     data class Update(val info: UpdateInfo) : HomeDialog
     data class Guide(val channel: Channel, val login: XtreamLogin) : HomeDialog
     data class TvLogs(val tvName: String, val text: String) : HomeDialog
+    data class Report(val text: String) : HomeDialog
 }
 
 /** Live TV / Movies / Series filter; Episode items only appear in Recent. */
@@ -405,6 +407,20 @@ private fun HomeScreen(
         delay(STARTUP_QUIET_MS * 2)
         val found = runCatching { Updates.check(context) }.getOrNull()
         if (found != null && dialog == null) dialog = HomeDialog.Update(found)
+    }
+    // Something went wrong since the last look: say so, with the way to send it
+    LaunchedEffect(Unit) {
+        val n = Problems.unseen(context)
+        if (n == 0 || crashReport != null) return@LaunchedEffect
+        delay(STARTUP_QUIET_MS)
+        val what = if (n == 1) "a problem" else "$n problems"
+        if (context.isTelevision()) {
+            notify("Stream Desk had $what. To send the details, on your phone: ⋮ → Problems from TV.")
+        } else {
+            val r = snackbar.showSnackbar("Stream Desk had $what.", actionLabel = "Send report", withDismissAction = true, duration = SnackbarDuration.Long)
+            if (r == SnackbarResult.ActionPerformed) dialog = HomeDialog.Report(Problems.report(context))
+            else Problems.markSeen(context)
+        }
     }
     var openLast by remember { mutableStateOf(Resume.enabled(context)) }
     var tileCount by remember { mutableStateOf(TileCount.load(context)) }
@@ -581,7 +597,10 @@ private fun HomeScreen(
                                 AppMenuItem(text = { Text("Continue from TV") }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.PickTv(TvJob.TakeOver)
                                 })
-                                AppMenuItem(text = { Text("Logs from TV") }, onClick = {
+                                AppMenuItem(text = { Text("Send problem report") }, onClick = {
+                                    moreMenu = false; dialog = HomeDialog.Report(Problems.report(context))
+                                })
+                                AppMenuItem(text = { Text("Problems from TV") }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.PickTv(TvJob.Logs)
                                 })
                             }
@@ -997,7 +1016,7 @@ private fun HomeScreen(
             onConfirm = { query = it.trim(); dialog = null },
         )
         is HomeDialog.PickTv -> TvPickerDialog(
-            title = when (d.job) { is TvJob.Login -> "Send login to TV"; TvJob.TakeOver -> "Continue from TV"; TvJob.Logs -> "Logs from TV"; else -> "Play on TV" },
+            title = when (d.job) { is TvJob.Login -> "Send login to TV"; TvJob.TakeOver -> "Continue from TV"; TvJob.Logs -> "Problems from TV"; else -> "Play on TV" },
             onDismiss = { dialog = null },
             onChosen = { device, code -> dialog = null; runTvJob(d.job, device, code) },
         )
@@ -1007,9 +1026,30 @@ private fun HomeScreen(
             onSave = { sportStore.save(it); dialog = null; section = Section.Sport },
         )
         is HomeDialog.Update -> UpdateDialog(d.info, onDismiss = { dialog = null })
+        is HomeDialog.Report -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Problem report") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Send it to yourself (WhatsApp, email…) and paste it to whoever fixes the app. Passwords are hidden.")
+                    Text(
+                        d.text,
+                        modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { Problems.markSeen(context); dialog = null; Problems.share(context, d.text) }) { Text("Send") }
+            },
+            dismissButton = {
+                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); Problems.markSeen(context); dialog = null; notify("Report copied.") }) { Text("Copy") }
+            },
+        )
         is HomeDialog.TvLogs -> AlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Logs from ${d.tvName}") },
+            title = { Text("Problems from ${d.tvName}") },
             text = {
                 Text(
                     d.text.ifBlank { "The TV hasn't logged anything yet." },
@@ -1019,9 +1059,11 @@ private fun HomeScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); dialog = null; notify("TV logs copied. Passwords are hidden.") }) { Text("Copy") }
+                TextButton(onClick = { dialog = null; Problems.share(context, d.text) }) { Text("Send") }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
+            dismissButton = {
+                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); dialog = null; notify("TV report copied. Passwords are hidden.") }) { Text("Copy") }
+            },
         )
         is HomeDialog.Guide -> ChannelGuideDialog(d.channel, d.login, onPlay = { dialog = null; playSport(d.channel) }, onDismiss = { dialog = null })
         HomeDialog.Logs -> LogsScreen(

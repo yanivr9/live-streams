@@ -82,6 +82,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -227,6 +228,12 @@ class PlayerActivity : ComponentActivity() {
             }
         })
 
+        // Every error the player ends up showing is written down for the problem report
+        lifecycleScope.launch {
+            snapshotFlow { status }.collect { s ->
+                if (s?.isError == true) Problems.record(this@PlayerActivity, "playback", "${current?.displayName() ?: "?"}: ${s.text}")
+            }
+        }
         if (!isTv) {
             // The Stop button on the "playing in the background" notification
             lifecycleScope.launch { BackgroundAudio.stopRequests.collect { finish() } }

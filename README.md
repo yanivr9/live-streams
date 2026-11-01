@@ -28,6 +28,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   codes are locked out. Scanning the QR code with the phone's camera opens a page on the TV with a button that starts
   Stream Desk on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
   send the login.
+- **Problem reports**: crashes, channels that end on an error, and failed sign-ins or playlist downloads are written down on each device (passwords hidden). The phone shows "Stream Desk had a problem – Send report" and ⋮ → Send problem report opens Android's share menu with the report; the TV's report reaches the phone through ⋮ → Problems from TV.
 - **Logs from TV**: on the phone, ⋮ → Logs from TV shows the TV's activity log (passwords hidden) with a Copy button, since copying on a TV box goes nowhere.
 - **Continue on phone**: ⋮ → Continue from TV on the phone (or Play here on the phone's remote screen) stops the TV and carries on
   with the same channel on the phone, so only one screen uses the account at a time.

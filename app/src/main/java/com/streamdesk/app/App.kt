@@ -21,6 +21,7 @@ class App : Application() {
                     redact(e.stackTraceToString()).take(8_000)
                 File(filesDir, CRASH_FILE).writeText(report)
             }
+            runCatching { Problems.record(this, "crash", e.stackTraceToString().lines().take(12).joinToString("\n")) }
             previous?.uncaughtException(thread, e)
         }
     }

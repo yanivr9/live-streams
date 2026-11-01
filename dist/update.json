@@ -1,6 +1,6 @@
 {
-  "versionCode": 53,
-  "versionName": "3.32",
+  "versionCode": 54,
+  "versionName": "3.33",
   "apk": "StreamDesk.apk",
-  "notes": "OK closes the new-version screen on the TV. The screen shows the address to type in Downloader. A clear logo when the app opens."
+  "notes": "Problems are now caught automatically on the phone and the TV, with a one-tap report to send."
 }
