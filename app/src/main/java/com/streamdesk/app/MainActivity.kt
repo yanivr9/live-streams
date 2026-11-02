@@ -1579,7 +1579,8 @@ private fun LoginEditor(
     var live by rememberSaveable { mutableStateOf(start?.live ?: true) }
     var movies by rememberSaveable { mutableStateOf(start?.movies ?: false) }
     var series by rememberSaveable { mutableStateOf(start?.series ?: false) }
-    var categories by rememberSaveable { mutableStateOf(start?.categories.orEmpty()) }
+    // A new login starts on the Hebrew folders, as this app is used; editing keeps what the login had
+    var categories by rememberSaveable { mutableStateOf(if (source == null && start?.categories.isNullOrBlank()) "Hebrew" else start?.categories.orEmpty()) }
     var updateMenu by remember { mutableStateOf(false) }
 
     fun onServerChange(text: String) {

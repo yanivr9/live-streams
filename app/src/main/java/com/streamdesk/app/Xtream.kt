@@ -77,7 +77,8 @@ data class XtreamLogin(
             val user = query["username"]?.takeIf { it.isNotBlank() } ?: return null
             val pass = query["password"]?.takeIf { it.isNotBlank() } ?: return null
             val port = if (uri.port > 0) ":${uri.port}" else ""
-            return XtreamLogin("${uri.scheme}://${uri.host}$port/", user, pass)
+            // Live channels only, like a login typed in: movies and series are tens of thousands of items
+            return XtreamLogin("${uri.scheme}://${uri.host}$port/", user, pass, movies = false, series = false)
         }
 
         /** True for links like http://host:8080/get.php?username=…&password=… */

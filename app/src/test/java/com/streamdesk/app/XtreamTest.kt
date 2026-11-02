@@ -158,6 +158,10 @@ class XtreamTest {
         assertEquals("p@2", login.password)
         assertTrue(XtreamLogin.isLoginLink("http://h:8080/get.php?username=a&password=b"))
         assertFalse(XtreamLogin.isLoginLink("http://h:8080/live/index.m3u8"))
+        // A login from a link loads live channels only, like a typed one
+        assertEquals(true, login.live)
+        assertEquals(false, login.movies)
+        assertEquals(false, login.series)
         assertNull(XtreamLogin.fromLink("http://h/get.php?username=a"))
     }
 

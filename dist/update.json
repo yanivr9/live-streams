@@ -1,6 +1,6 @@
 {
-  "versionCode": 63,
-  "versionName": "3.42",
+  "versionCode": 64,
+  "versionName": "3.43",
   "apk": "StreamDesk.apk",
-  "notes": "On the phone, the ⋮ options open as a panel from the bottom, so they no longer cover the top of the app."
+  "notes": "New logins start with live channels only and the Hebrew folders (a login from a link turned on movies and series)."
 }
