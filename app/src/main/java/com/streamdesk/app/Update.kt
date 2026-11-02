@@ -38,11 +38,16 @@ object Updates {
         context.packageManager.getPackageInfo(context.packageName, 0).versionCode
 
     /** The newer version if there is one, null if you are up to date. Throws when the server can't be reached. */
-    suspend fun check(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun check(context: Context, force: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
+        // Opening the app again (or turning the phone) doesn't ask GitHub again within half an hour
+        lastCheck?.let { (at, info) -> if (!force && System.currentTimeMillis() - at < RECHECK_MS) return@withContext info }
         val text = fetchText(UPDATE_URL).text
         val info = parse(text) ?: throw IllegalStateException("The update file isn't valid.")
-        info.takeIf { isNewer(it, installedCode(context)) }
+        info.takeIf { isNewer(it, installedCode(context)) }.also { lastCheck = System.currentTimeMillis() to it }
     }
+
+    private const val RECHECK_MS = 30 * 60_000L
+    @Volatile private var lastCheck: Pair<Long, UpdateInfo?>? = null
 
     /**
      * Opens the new version's download link in the browser (phones). The app doesn't install anything itself: an app that

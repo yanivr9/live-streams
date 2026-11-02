@@ -1,6 +1,6 @@
 {
-  "versionCode": 55,
-  "versionName": "3.34",
+  "versionCode": 56,
+  "versionName": "3.35",
   "apk": "StreamDesk.apk",
-  "notes": "What's on now loads faster and isn't downloaded again every time you open the channels."
+  "notes": "Fewer downloads in the background: what's on now and the update check aren't repeated when you turn the phone or reopen the app."
 }

@@ -8,6 +8,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.async
@@ -208,18 +213,44 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** "What's on now" labels for the whole app session, so they aren't fetched again each time the channels show. */
+/**
+ * "What's on now" for the whole app session. The downloads run outside the screen, so rotating the phone or reopening
+ * the app doesn't throw away a download halfway and start it again; within 3 minutes the labels are simply reused.
+ */
 private object NowOnCache {
-    const val FRESH_MS = 3 * 60_000L
-    @Volatile private var labels: Map<String, String> = emptyMap()
-    @Volatile private var asked: Set<String> = emptySet()   // the channels the labels were fetched for
-    @Volatile private var at = 0L
-    fun labels(): Map<String, String> = labels
-    /** How long until the labels for these channels need fetching again; 0 if now (stale, or other channels). */
-    fun waitMs(channels: Collection<String>): Long =
-        if (!asked.containsAll(channels)) 0 else (FRESH_MS - (System.currentTimeMillis() - at)).coerceAtLeast(0)
-    fun store(channels: Collection<String>, new: Map<String, String>) {
-        labels = new; asked = channels.toSet(); at = System.currentTimeMillis()
+    private const val FRESH_MS = 3 * 60_000L
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val _labels = MutableStateFlow<Map<String, String>>(emptyMap())
+    val labels: StateFlow<Map<String, String>> = _labels
+    private var asked: Set<String> = emptySet()   // the channels the labels were fetched for
+    private var at = 0L
+    private var running: Job? = null
+    private var runningFor: Set<String> = emptySet()
+
+    /** Fetches the labels for these channels (link → login) unless they're fresh or already on their way. */
+    @Synchronized
+    fun ensure(channels: List<Pair<String, XtreamLogin>>) {
+        val urls = channels.mapTo(HashSet()) { it.first }
+        if (urls.isEmpty()) return
+        if (asked.containsAll(urls) && System.currentTimeMillis() - at < FRESH_MS) return
+        if (running?.isActive == true && runningFor == urls) return
+        running?.cancel()
+        runningFor = urls
+        running = scope.launch {
+            // A few channels at a time instead of one after another
+            val result = channels.chunked(6).flatMap { batch ->
+                coroutineScope {
+                    batch.map { (url, login) ->
+                        async {
+                            val programs = runCatching { Epg.load(login, url) }.getOrDefault(emptyList())
+                            Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { url to it }
+                        }
+                    }.awaitAll()
+                }
+            }.filterNotNull().toMap()
+            synchronized(this@NowOnCache) { asked = urls; at = System.currentTimeMillis() }
+            _labels.value = result
+        }
     }
 }
 
@@ -507,28 +538,15 @@ private fun HomeScreen(
         if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
     }
     val israelPicked = remember(scoped, deviceQuality) { IsraelList.pick(scoped, deviceQuality) }
-    // What's on now, from the provider's guide; refreshed every few minutes. Kept for the whole app session, so coming
-    // back to this screen shows it at once instead of fetching every channel again.
-    var guide by remember { mutableStateOf(NowOnCache.labels()) }
+    // What's on now, from the provider's guide; kept for the app session and refreshed every 3 minutes
+    val guide by NowOnCache.labels.collectAsState()
     LaunchedEffect(sportPicked, israelPicked, sources) {
         if (guide.isEmpty()) delay(STARTUP_QUIET_MS)
         val channels = (sportPicked + israelPicked).distinctBy { it.url }
+            .mapNotNull { ch -> sources.firstOrNull { it.url == ch.source }?.xtream?.let { ch.url to it } }
         while (true) {
-            delay(NowOnCache.waitMs(channels.map { it.url }))
-            // A few channels at a time instead of one after another: the labels arrive in well under a second
-            val labels = coroutineScope {
-                channels.chunked(6).flatMap { batch ->
-                    batch.map { ch ->
-                        async {
-                            val login = sources.firstOrNull { it.url == ch.source }?.xtream ?: return@async null
-                            val programs = runCatching { Epg.load(login, ch.url) }.getOrDefault(emptyList())
-                            Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { ch.url to it }
-                        }
-                    }.awaitAll()
-                }.filterNotNull().toMap()
-            }
-            NowOnCache.store(channels.map { it.url }, labels)
-            guide = labels
+            NowOnCache.ensure(channels)   // does nothing while the labels are fresh
+            delay(30_000)
         }
     }
     val groups = remember(scoped, section) {
@@ -659,7 +677,7 @@ private fun HomeScreen(
                                 moreMenu = false
                                 scope.launch {
                                     try {
-                                        val found = Updates.check(context)
+                                        val found = Updates.check(context, force = true)
                                         if (found != null) dialog = HomeDialog.Update(found)
                                         else notify("You have the latest version.")
                                     } catch (e: Exception) {
