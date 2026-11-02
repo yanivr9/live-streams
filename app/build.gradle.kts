@@ -44,6 +44,7 @@ android {
             // About what Android gives one app on a typical phone (largeHeap raises it on some)
             it.maxHeapSize = "1g"   // the screen tests run a whole simulated Android
             // The simulated Android's system files, from Google's copy of Maven Central (the main site often says "too many requests")
+            System.getProperty("tvshots")?.let { dir -> it.systemProperty("tvshots", dir) }   // pictures of the TV screens, on request
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
         }
     }
