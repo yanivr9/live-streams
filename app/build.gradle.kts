@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 59
-        versionName = "3.38"
+        versionCode = 60
+        versionName = "3.39"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -39,9 +39,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     testOptions {
+        unitTests.isIncludeAndroidResources = true
         unitTests.all {
             // About what Android gives one app on a typical phone (largeHeap raises it on some)
-            it.maxHeapSize = "256m"
+            it.maxHeapSize = "1g"   // the screen tests run a whole simulated Android
+            // The simulated Android's system files, from Google's copy of Maven Central (the main site often says "too many requests")
+            it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
         }
     }
     buildFeatures {
@@ -79,6 +82,13 @@ dependencies {
 }
 
 dependencies {
+    // Screen tests: the real activities on a simulated Android (Robolectric), driven like a user
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation("androidx.test.ext:junit-ktx:1.2.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")

@@ -1,6 +1,6 @@
 {
-  "versionCode": 59,
-  "versionName": "3.38",
+  "versionCode": 60,
+  "versionName": "3.39",
   "apk": "StreamDesk.apk",
-  "notes": "The channels screen on the phone stays upright; the player still turns for full-screen video."
+  "notes": "Bug fixes: a channel left buffering no longer keeps playing unseen, no 'Playing' notice when paused, closing the small video window stops it, deleted logins stay deleted, 'Stop the TV' explains what happened."
 }

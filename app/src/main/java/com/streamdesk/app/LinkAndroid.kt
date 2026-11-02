@@ -150,7 +150,8 @@ class TvFinder(context: Context) {
                 resolveNext()
             }
             override fun onServiceLost(info: NsdServiceInfo) {
-                _devices.value = _devices.value.filterNot { it.name == info.serviceName }
+                val name = info.serviceName.replace("\\032", " ")   // stored with the spaces unescaped
+                _devices.value = _devices.value.filterNot { it.name == name }
             }
         }
         listener = l

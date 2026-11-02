@@ -74,6 +74,9 @@ class ChannelStore private constructor(context: Context) {
 
     // Downloads run here, not in a screen's scope, so leaving or rebuilding a screen never cancels them
     private val jobs = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // Playlists removed (or replaced by an edited login) while their download may still be running: when it
+    // finishes, its results are dropped instead of bringing the playlist back
+    private val removed = HashSet<String>()
 
     private val _progress = MutableStateFlow<Map<String, String>>(emptyMap())
     /** Playlists loading right now, with what is happening (playlist url → status text). */
@@ -91,6 +94,7 @@ class ChannelStore private constructor(context: Context) {
 
     /** Downloads a playlist link, or refreshes a saved playlist or login, in the background. */
     fun startPlaylist(url: String, name: String? = null, prefetched: Fetched? = null, quiet: Boolean = false) {
+        removed -= url
         if (url in _progress.value) return
         val existing = _sources.value.firstOrNull { it.url == url }
         if (existing?.xtream != null) {
@@ -145,6 +149,7 @@ class ChannelStore private constructor(context: Context) {
 
     private fun runXtream(source: PlaylistSource, quiet: Boolean, isNew: Boolean) {
         val url = source.url
+        removed -= url
         if (url in _progress.value) return
         setProgress(url, "Signing in…")
         AppLog.i("signin", "Start: \"${source.name}\" at ${source.xtream?.base} (channels ${source.xtream?.live}, movies ${source.xtream?.movies}, series ${source.xtream?.series})")
@@ -247,6 +252,8 @@ class ChannelStore private constructor(context: Context) {
 
     /** Removes a playlist link and its channels. Favorites are kept as hand-added channels. */
     fun removePlaylist(url: String) {
+        removed += url
+        setProgress(url, null)
         update { list -> list.mapNotNull { if (it.source != url) it else if (it.favorite) it.copy(source = "") else null } }
         _sources.value = _sources.value.filterNot { it.url == url }
         save(FILE_SOURCES, _sources.value, PlaylistSource::toJson)
@@ -259,6 +266,7 @@ class ChannelStore private constructor(context: Context) {
 
     /** Swaps a playlist's channels for a fresh copy in the same place in the list, keeping favorites. */
     private fun replaceSourceChannels(url: String, parsed: List<Channel>): Int {
+        if (url in removed) return 0
         var count = 0
         update { current ->
             val favorites = current.filter { it.source == url && it.favorite }.mapTo(HashSet()) { it.url }
@@ -274,6 +282,7 @@ class ChannelStore private constructor(context: Context) {
     }
 
     private fun putSource(source: PlaylistSource) {
+        if (source.url in removed) return
         val list = _sources.value
         _sources.value = if (list.any { it.url == source.url }) list.map { if (it.url == source.url) source else it } else list + source
         save(FILE_SOURCES, _sources.value, PlaylistSource::toJson)
@@ -338,6 +347,8 @@ class ChannelStore private constructor(context: Context) {
 
         fun get(context: Context): ChannelStore =
             instance ?: synchronized(this) { instance ?: ChannelStore(context.applicationContext).also { instance = it } }
+        /** Screen tests start each test from the files they wrote, not from the previous test's store. */
+        internal fun resetForTests() { instance = null }
     }
 }
 

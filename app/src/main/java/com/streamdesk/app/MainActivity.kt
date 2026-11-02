@@ -160,7 +160,7 @@ class MainActivity : ComponentActivity() {
         }
         super.onCreate(savedInstanceState)
         // On a phone the channels screen stays upright; the player still turns for full-screen video
-        if (!isTelevision()) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (!isTelevision() && resources.configuration.smallestScreenWidthDp < 600) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
         val store = ChannelStore.get(this)
         if (savedInstanceState == null) importFromIntent(intent)

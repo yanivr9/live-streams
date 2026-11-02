@@ -96,6 +96,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -254,7 +255,14 @@ class PlayerActivity : ComponentActivity() {
         // Record when the phone turns its screen off, so a black screen can be told apart from a stopped video
         ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
         goFullscreen()
-        addOnPictureInPictureModeChangedListener { inPip = it.isInPictureInPictureMode }
+        addOnPictureInPictureModeChangedListener {
+            inPip = it.isInPictureInPictureMode
+            // The small window was swiped away (it left picture-in-picture without coming back on screen): stop, as Back does
+            if (!it.isInPictureInPictureMode && !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                AppLog.i("player", "  the small window was closed")
+                finish()
+            }
+        }
         setContent { StreamDeskTheme(isTv = isTv) { PlayerScreen() } }
 
         if (!loadFromIntent(intent)) {
@@ -264,22 +272,22 @@ class PlayerActivity : ComponentActivity() {
         // Runs for as long as the player is open, also in the background while only the sound plays,
         // so a stream that freezes with the screen off still reconnects
         lifecycleScope.launch {
-            run {
-                var seconds = 0
-                var bufferingFor = 0
-                while (true) {
-                    updateStats()
-                    bufferingFor = if (player.playbackState == Player.STATE_BUFFERING && castTarget == null) bufferingFor + 1 else 0
-                    if (bufferingFor >= STALL_SECONDS && reachedReady && liveLike()) {
-                        bufferingFor = 0
-                        reconnectLive("frozen for $STALL_SECONDS s")
-                    }
-                    // A line every 30 s: if the picture goes black, the log shows whether playback was still running
-                    if (++seconds % 30 == 0) {
-                        AppLog.i("player", "  alive ${seconds}s: ${stateName(player.playbackState)}, playing=${player.isPlaying}, buffer ${stats.buffer}, dropped ${stats.dropped}")
-                    }
-                    delay(1000)
+            var seconds = 0
+            var bufferingFor = 0
+            while (true) {
+                val onScreen = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) || isInPictureInPictureMode
+                if (onScreen) updateStats()
+                val watched = onScreen || videoOffInBackground   // on screen, or its sound playing in the background
+                bufferingFor = if (watched && player.playbackState == Player.STATE_BUFFERING && castTarget == null) bufferingFor + 1 else 0
+                if (bufferingFor >= STALL_SECONDS && reachedReady && liveLike()) {
+                    bufferingFor = 0
+                    reconnectLive("frozen for $STALL_SECONDS s")
                 }
+                // A line every 30 s: if the picture goes black, the log shows whether playback was still running
+                if (++seconds % 30 == 0) {
+                    AppLog.i("player", "  alive ${seconds}s: ${stateName(player.playbackState)}, playing=${player.isPlaying}, buffer ${stats.buffer}, dropped ${stats.dropped}")
+                }
+                delay(1000)
             }
         }
     }
@@ -321,10 +329,8 @@ class PlayerActivity : ComponentActivity() {
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false).build()
             videoOffInBackground = false
         }
-        if (pausedByStop) {
-            AppLog.i("player", "  app is back on screen; resuming")
-            current?.let { startBackgroundService(it.displayName()) }
-        }
+        if (pausedByStop) AppLog.i("player", "  app is back on screen; resuming")
+        if (pausedByStop || (player.playWhenReady && status?.isError != true)) current?.let { startBackgroundService(it.displayName()) }
         if (pausedByStop && closedInBackground) load() else if (pausedByStop) player.play()
         closedInBackground = false
         pausedByStop = false
@@ -333,28 +339,36 @@ class PlayerActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         AppLog.i("player", "  app left the screen (playing=${player.isPlaying}, picture-in-picture=$isInPictureInPictureMode)")
-        // Keep playing in picture-in-picture; pause when the app really goes to the background
-        if (!isInPictureInPictureMode && player.isPlaying) {
-            if (!isTv && castTarget == null && BackgroundAudio.enabled(this)) {
-                // The sound goes on; the picture isn't needed while nothing is looking at it
-                AppLog.i("player", "  the sound keeps playing in the background")
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
-                videoOffInBackground = true
-                return
-            }
-            stopService(Intent(this, PlaybackService::class.java))   // nothing plays in the background now
-            if (liveLike() && castTarget == null) {
-                // A paused live stream still holds its connection, and so uses up one of the account's screens
-                AppLog.i("player", "  closing the live stream because the app is in the background")
-                handler.removeCallbacksAndMessages(null)
-                player.stop()
-                closedInBackground = true
-            } else {
-                AppLog.i("player", "  pausing because the app is in the background")
-                player.pause()
-            }
-            pausedByStop = true
+        if (isInPictureInPictureMode) return   // the small window keeps playing
+        // "Playing" also covers a stream that is starting, buffering or about to reconnect: it would otherwise
+        // carry on in the background unseen, using the account's one screen
+        val active = castTarget == null && player.playWhenReady && status?.isError != true
+        if (!active) {
+            // Nothing is playing (paused, failed, or on the TV): no background sound and no "Playing" notice
+            handler.removeCallbacksAndMessages(null)
+            stopService(Intent(this, PlaybackService::class.java))
+            return
         }
+        if (!isTv && BackgroundAudio.enabled(this)) {
+            // The sound goes on; the picture isn't needed while nothing is looking at it
+            AppLog.i("player", "  the sound keeps playing in the background")
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+            videoOffInBackground = true
+            return
+        }
+        stopService(Intent(this, PlaybackService::class.java))
+        handler.removeCallbacksAndMessages(null)
+        if (liveLike()) {
+            // A paused live stream still holds its connection, and so uses up one of the account's screens
+            AppLog.i("player", "  closing the live stream because the app is in the background")
+            player.stop()
+            streamOpen = false
+            closedInBackground = true
+        } else {
+            AppLog.i("player", "  pausing because the app is in the background")
+            player.pause()
+        }
+        pausedByStop = true
     }
 
     // Opened straight into the player (sent from the phone, or Android had closed the app's home screen):
@@ -993,6 +1007,7 @@ class PlayerActivity : ComponentActivity() {
                 OutlinedButton(onClick = {
                     sendToTv(tv, "stop")
                     castTarget = null
+                    status = Status("Stopped on the TV. Tap + or − to watch here, or Back for the channels.")
                 }) { Text("Stop the TV") }
                 Button(onClick = { takeBack(tv) }) { Text("Play here") }
             }
