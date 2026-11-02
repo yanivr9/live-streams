@@ -1,6 +1,6 @@
 {
-  "versionCode": 56,
-  "versionName": "3.35",
+  "versionCode": 57,
+  "versionName": "3.36",
   "apk": "StreamDesk.apk",
-  "notes": "Fewer downloads in the background: what's on now and the update check aren't repeated when you turn the phone or reopen the app."
+  "notes": "Fixes a black screen after turning the phone on the channels screen."
 }

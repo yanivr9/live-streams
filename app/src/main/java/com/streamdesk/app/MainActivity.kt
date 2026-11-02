@@ -150,9 +150,13 @@ class MainActivity : ComponentActivity() {
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // The logo shows straight away while the app starts, and stays long enough to be seen
-        val shownAt = SystemClock.uptimeMillis()
-        installSplashScreen().setKeepOnScreenCondition { SystemClock.uptimeMillis() - shownAt < SPLASH_MIN_MS }
+        // The logo shows straight away while the app starts, and stays long enough to be seen. Only on a real start:
+        // holding it again when the screen is rebuilt (e.g. after turning the phone) can leave the screen black.
+        val splash = installSplashScreen()
+        if (savedInstanceState == null) {
+            val shownAt = SystemClock.uptimeMillis()
+            splash.setKeepOnScreenCondition { SystemClock.uptimeMillis() - shownAt < SPLASH_MIN_MS }
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val store = ChannelStore.get(this)
