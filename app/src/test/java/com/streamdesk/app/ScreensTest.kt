@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 
 import androidx.compose.ui.test.performScrollToNode
@@ -80,6 +81,35 @@ class PhoneScreensTest {
             compose.onNodeWithText("Copy").performClick()
             compose.waitForIdle()
         }
+    }
+
+    @Test
+    fun addingChannelsOpensWithBothChoices() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.waitForIdle()
+            // The add button in the top bar goes straight to the Add channels window
+            compose.onNodeWithContentDescription("Add channels").performClick()
+            compose.waitForIdle()
+            compose.onNodeWithText("Username & password").assertExists()
+            compose.onNodeWithText("Playlist link").assertExists()
+            // (Text fields inside pop-up windows never settle in this simulator, so the link page is checked in
+            // linksWithoutHttpAreAccepted instead.) Username & password → Continue opens the sign-in screen
+            compose.onNodeWithText("Continue").assertIsEnabled().performClick()
+            compose.waitForIdle()
+        }
+    }
+
+    @Test
+    fun linksWithoutHttpAreAccepted() {
+        assertEquals("http://server.com:8080/tv.m3u", normalizeLink(" server.com:8080/tv.m3u "))
+        assertEquals("https://x.com/a.m3u", normalizeLink("https://x.com/a.m3u"))
+        assertEquals(null, normalizeLink("not a link"))
+        assertEquals(null, normalizeLink("hello"))
+        assertEquals(null, normalizeLink("ftp://x.com/a"))
+        // A provider's get.php link with a username and password goes to the sign-in instead of being added as a list
+        val provider = normalizeLink("cdn.example.com:8080/get.php?username=u&password=p&type=m3u")!!
+        assertEquals(true, XtreamLogin.isLoginLink(provider))
+        assertEquals("u", XtreamLogin.fromLink(provider)?.username)
     }
 
     @Test

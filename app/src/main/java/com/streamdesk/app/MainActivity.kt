@@ -118,6 +118,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHost
@@ -281,7 +284,8 @@ private sealed interface HomeDialog {
     data class Rename(val channel: Channel) : HomeDialog
     data class RenamePlaylist(val source: PlaylistSource) : HomeDialog
     data class RemovePlaylist(val source: PlaylistSource) : HomeDialog
-    data object AddPlaylist : HomeDialog
+    /** Adding channels; [linkFirst] opens on "Playlist link" instead of "Username & password". */
+    data class AddPlaylist(val linkFirst: Boolean = false) : HomeDialog
     data object PasteText : HomeDialog
     data class LinkError(val link: String, val message: String) : HomeDialog
     /** Full-screen sign-in editor: [source] when editing a saved login, [prefill] for a new one. */
@@ -343,7 +347,6 @@ private fun HomeScreen(
     val progress by store.progress.collectAsState()   // playlists loading right now → status
     val loading = progress.keys
     var checkingLink by remember { mutableStateOf(false) }
-    var importMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     // The "enter a link" bar is only in the way once there's a playlist; ⋮ → Open a link brings it back
     var linkBarOpen by rememberSaveable { mutableStateOf(false) }
@@ -601,22 +604,8 @@ private fun HomeScreen(
                         }
                     }
                     Box {
-                        IconButton(onClick = { importMenu = true }) {
+                        IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }) {
                             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
-                        }
-                        DropdownMenu(importMenu, onDismissRequest = { importMenu = false }) {
-                            AppMenuItem(text = { Text("Sign in with username & password") }, onClick = {
-                                importMenu = false; dialog = HomeDialog.EditLogin(null, null)
-                            })
-                            AppMenuItem(text = { Text("Add playlist link") }, onClick = {
-                                importMenu = false; dialog = HomeDialog.AddPlaylist
-                            })
-                            AppMenuItem(text = { Text("Import .m3u file") }, onClick = {
-                                importMenu = false; openFile.launch(arrayOf("*/*"))
-                            })
-                            AppMenuItem(text = { Text("Paste playlist text") }, onClick = {
-                                importMenu = false; dialog = HomeDialog.PasteText
-                            })
                         }
                     }
                     Box {
@@ -846,7 +835,7 @@ private fun HomeScreen(
                 PlaylistsPane(
                     sources = sources,
                     progress = progress,
-                    onAdd = { dialog = HomeDialog.AddPlaylist },
+                    onAdd = { dialog = HomeDialog.AddPlaylist() },
                     onRefresh = { loadPlaylist(it.url) },
                     onShow = {
                         section = Section.All
@@ -1027,10 +1016,14 @@ private fun HomeScreen(
             },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
-        HomeDialog.AddPlaylist -> AddPlaylistDialog(
+        is HomeDialog.AddPlaylist -> AddPlaylistDialog(
+            linkFirst = d.linkFirst,
+            onImportFile = { dialog = null; openFile.launch(arrayOf("*/*")) },
+            onPasteText = { dialog = HomeDialog.PasteText },
             initialLink = clipboard.getText()?.text?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) && ' ' !in it }.orEmpty(),
             onDismiss = { dialog = null },
             onConfirm = { link, name -> dialog = null; loadPlaylist(link, name.ifBlank { null }) },
+            onSignIn = { prefill -> dialog = HomeDialog.EditLogin(null, prefill) },
         )
         HomeDialog.PasteText -> TextDialog(
             title = "Paste playlist",
@@ -1187,7 +1180,7 @@ private fun PlaylistsPane(
             Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Add playlist link")
+                Text("Add channels")
             }
         }
         if (sources.isEmpty() && pending.isEmpty()) item {
@@ -1277,41 +1270,96 @@ private fun MonoLine(text: String) = Text(
     color = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
+/** A link as typed: "server.com:8080/list.m3u" works too (http:// is added); null if it isn't a link. */
+internal fun normalizeLink(text: String): String? {
+    val t = text.trim()
+    if (t.isEmpty() || t.any { it.isWhitespace() }) return null
+    val withScheme = if (Regex("^[a-z][a-z0-9+.-]*://", RegexOption.IGNORE_CASE).containsMatchIn(t)) t else "http://$t"
+    val uri = runCatching { java.net.URI(withScheme) }.getOrNull() ?: return null
+    if (uri.scheme?.lowercase() !in setOf("http", "https")) return null
+    val host = uri.host ?: return null
+    return withScheme.takeIf { '.' in host || host == "localhost" }
+}
+
+/**
+ * Adding channels: the two ways side by side. "Username & password" (what IPTV providers give, and what the app
+ * handles best) goes on to the sign-in screen; "Playlist link" takes an M3U link. A get.php link with a username
+ * and password in it is sent to the sign-in screen, filled in.
+ */
 @Composable
-private fun AddPlaylistDialog(initialLink: String, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
+private fun AddPlaylistDialog(linkFirst: Boolean, onImportFile: () -> Unit, onPasteText: () -> Unit, initialLink: String, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit, onSignIn: (XtreamLogin?) -> Unit) {
+    var useLink by rememberSaveable { mutableStateOf(linkFirst || (initialLink.isNotEmpty() && !XtreamLogin.isLoginLink(initialLink))) }
     var link by rememberSaveable { mutableStateOf(initialLink) }
     var name by rememberSaveable { mutableStateOf("") }
-    val valid = Regex("^https?://\\S+$", RegexOption.IGNORE_CASE).matches(link.trim())
+    val normalized = normalizeLink(link)
+    val loginInLink = normalized?.let { if (XtreamLogin.isLoginLink(it)) XtreamLogin.fromLink(it) else null }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add playlist link") },
+        title = { Text("Add channels") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Paste the link to your M3U channel list. It's updated automatically once a day.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = link,
-                    onValueChange = { link = it },
-                    label = { Text("Playlist link") },
-                    placeholder = { Text("https://…/playlist.m3u") },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(selected = !useLink, onClick = { useLink = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
+                        Text("Username & password", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    SegmentedButton(selected = useLink, onClick = { useLink = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) {
+                        Text("Playlist link", maxLines = 1)
+                    }
+                }
+                if (!useLink) {
+                    Text(
+                        "Sign in with the server address, username and password your IPTV provider gave you. " +
+                            "Best for providers: channels with logos, folders and the TV guide.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        "Paste the link to your M3U channel list. It's updated automatically once a day.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = link,
+                        onValueChange = { link = it },
+                        label = { Text("Playlist link") },
+                        placeholder = { Text("server.com:8080/playlist.m3u") },
+                        singleLine = true,
+                        isError = link.isNotBlank() && normalized == null,
+                        supportingText = when {
+                            link.isNotBlank() && normalized == null -> { { Text("That isn't a link. It looks like server.com/list.m3u, with no spaces.") } }
+                            loginInLink != null -> { { Text("This link has a username and password in it: it will sign you in.") } }
+                            else -> null
+                        },
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (loginInLink == null) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Name (optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    // The rarer ways, for a list saved as a file or copied as text
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Or:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = onImportFile) { Text("Open a .m3u file") }
+                        TextButton(onClick = onPasteText) { Text("Paste text") }
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(link.trim(), name.trim()) }, enabled = valid) { Text("Add") } },
+        confirmButton = {
+            when {
+                !useLink -> TextButton(onClick = { onSignIn(null) }) { Text("Continue") }
+                loginInLink != null -> TextButton(onClick = { onSignIn(loginInLink) }) { Text("Sign in") }
+                else -> TextButton(onClick = { onConfirm(normalized!!, name.trim()) }, enabled = normalized != null) { Text("Add") }
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -1559,9 +1607,17 @@ private fun LoginEditor(
                     },
                 )
             },
+            // Always in full view: above the gesture bar, and above the keyboard while typing
+            bottomBar = {
+                Button(
+                    onClick = ::save,
+                    enabled = valid,
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
+                ) { Text(if (source == null) "Sign in" else "Save") }
+            },
         ) { padding ->
             Column(
-                Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).imePadding(),
+                Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()),
             ) {
                 Column(
                     Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -1647,11 +1703,6 @@ private fun LoginEditor(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                Button(
-                    onClick = ::save,
-                    enabled = valid,
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-                ) { Text(if (source == null) "Sign in" else "Save") }
             }
         }
     }
