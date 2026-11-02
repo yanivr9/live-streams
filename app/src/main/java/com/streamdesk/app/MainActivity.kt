@@ -118,6 +118,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -597,22 +600,9 @@ private fun HomeScreen(
         }
     }
 
-    val topActions: @Composable RowScope.() -> Unit = {
-                    if (LocalIsTv.current) {
-                        IconButton(onClick = { dialog = HomeDialog.LinkPhone }) {
-                            Icon(Icons.Default.Cast, contentDescription = "Link a phone")
-                        }
-                    }
-                    Box {
-                        IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }) {
-                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
-                        }
-                    }
-                    Box {
-                        IconButton(onClick = { moreMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                        }
-                        DropdownMenu(moreMenu, onDismissRequest = { moreMenu = false }) {
+    val isTvMenu = LocalIsTv.current
+    // The ⋮ entries, shown as a menu on a TV and as a panel from the bottom on a phone
+    val moreEntries: @Composable ColumnScope.() -> Unit = {
                             if (sources.isNotEmpty()) {
                                 AppMenuItem(text = { Text("Update all playlists") }, onClick = {
                                     moreMenu = false; sources.forEach { loadPlaylist(it.url) }
@@ -692,6 +682,32 @@ private fun HomeScreen(
                             AppMenuItem(text = { Text("Logs") }, onClick = {
                                 moreMenu = false; dialog = HomeDialog.Logs
                             })
+    }
+
+    val topActions: @Composable RowScope.() -> Unit = {
+                    if (LocalIsTv.current) {
+                        IconButton(onClick = { dialog = HomeDialog.LinkPhone }) {
+                            Icon(Icons.Default.Cast, contentDescription = "Link a phone")
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }) {
+                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { moreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                        }
+                        // On a TV the remote moves through a menu next to the button; on a phone the long list slides up
+                        // from the bottom instead, so it never covers the top of the app
+                        if (isTvMenu) {
+                            DropdownMenu(moreMenu, onDismissRequest = { moreMenu = false }) { moreEntries() }
+                        } else if (moreMenu) {
+                            // Opens all the way, so every entry is in view without dragging the panel up first
+                            ModalBottomSheet(onDismissRequest = { moreMenu = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+                                Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 8.dp)) { moreEntries() }
+                            }
                         }
                     }
     }

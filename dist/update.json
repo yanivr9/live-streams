@@ -1,6 +1,6 @@
 {
-  "versionCode": 62,
-  "versionName": "3.41",
+  "versionCode": 63,
+  "versionName": "3.42",
   "apk": "StreamDesk.apk",
-  "notes": "Adding channels is clearer: one window with Username & password or Playlist link; links work without http://; the Sign in button is no longer cut off."
+  "notes": "On the phone, the ⋮ options open as a panel from the bottom, so they no longer cover the top of the app."
 }

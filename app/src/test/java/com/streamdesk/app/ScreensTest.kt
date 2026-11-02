@@ -3,7 +3,9 @@ package com.streamdesk.app
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
@@ -75,10 +77,11 @@ class PhoneScreensTest {
             // The menu and the problem report
             compose.onNodeWithContentDescription("More options").performClick()
             compose.waitForIdle()
-            compose.onNodeWithText("Send problem report").performClick()
+            // (Taps don't reach pop-up windows in this simulator, so the entry is pressed directly)
+            compose.onNodeWithText("Send problem report").performSemanticsAction(SemanticsActions.OnClick)
             compose.waitForIdle()
             compose.onNodeWithText("Problem report").assertExists()
-            compose.onNodeWithText("Copy").performClick()
+            compose.onNodeWithText("Copy").performSemanticsAction(SemanticsActions.OnClick)
             compose.waitForIdle()
         }
     }
