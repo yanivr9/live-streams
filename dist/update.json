@@ -1,6 +1,6 @@
 {
-  "versionCode": 57,
-  "versionName": "3.36",
+  "versionCode": 58,
+  "versionName": "3.37",
   "apk": "StreamDesk.apk",
-  "notes": "Fixes a black screen after turning the phone on the channels screen."
+  "notes": "Fixes: black screen after turning the phone; a frozen stream now reconnects with the screen off; no 'Playing' notice when nothing plays."
 }

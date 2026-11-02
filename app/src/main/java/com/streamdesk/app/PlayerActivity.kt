@@ -96,9 +96,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -263,8 +261,10 @@ class PlayerActivity : ComponentActivity() {
             finish()
             return
         }
+        // Runs for as long as the player is open, also in the background while only the sound plays,
+        // so a stream that freezes with the screen off still reconnects
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
+            run {
                 var seconds = 0
                 var bufferingFor = 0
                 while (true) {
@@ -286,8 +286,8 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        loadFromIntent(intent)
+        // Only a new channel replaces what the player holds; the "Playing" notification just brings it back
+        if (loadFromIntent(intent)) setIntent(intent)
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -321,7 +321,10 @@ class PlayerActivity : ComponentActivity() {
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false).build()
             videoOffInBackground = false
         }
-        if (pausedByStop) AppLog.i("player", "  app is back on screen; resuming")
+        if (pausedByStop) {
+            AppLog.i("player", "  app is back on screen; resuming")
+            current?.let { startBackgroundService(it.displayName()) }
+        }
         if (pausedByStop && closedInBackground) load() else if (pausedByStop) player.play()
         closedInBackground = false
         pausedByStop = false
@@ -339,6 +342,7 @@ class PlayerActivity : ComponentActivity() {
                 videoOffInBackground = true
                 return
             }
+            stopService(Intent(this, PlaybackService::class.java))   // nothing plays in the background now
             if (liveLike() && castTarget == null) {
                 // A paused live stream still holds its connection, and so uses up one of the account's screens
                 AppLog.i("player", "  closing the live stream because the app is in the background")
