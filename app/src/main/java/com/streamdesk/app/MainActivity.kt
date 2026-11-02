@@ -57,6 +57,12 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -716,6 +722,20 @@ private fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        // Scrolling the channels with a finger closes the keyboard (for example after typing in the search box)
+        val keyboard = LocalSoftwareKeyboardController.current
+        val focusManager = LocalFocusManager.current
+        val hideKeyboardOnScroll = remember(keyboard, focusManager) {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                        keyboard?.hide()
+                        focusManager.clearFocus()
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
         // On a phone, the channels follow your finger as you drag left or right; when you let go, the next or previous tab opens
         val dragX = remember { Animatable(0f) }
         var paneWidth by remember { mutableFloatStateOf(1f) }
@@ -811,7 +831,7 @@ private fun HomeScreen(
                 }
             }
 
-            Column(Modifier.weight(1f).fillMaxWidth().then(swipeToTab)) {
+            Column(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnScroll).then(swipeToTab)) {
             if (section == Section.Guide) {
                 SportGuidePane(
                     channels = sportPicked,
