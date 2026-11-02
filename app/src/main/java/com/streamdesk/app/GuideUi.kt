@@ -116,39 +116,6 @@ fun ChannelGuideDialog(channel: Channel, login: XtreamLogin, onPlay: () -> Unit,
     }
 }
 
-/** The Guide tab: today's and tomorrow's programs on all the Sport channels, in time order. */
-@Composable
-fun SportGuidePane(channels: List<Channel>, loginFor: (Channel) -> XtreamLogin?, onPlay: (Channel) -> Unit, onNotYet: (Channel, Program) -> Unit, modifier: Modifier = Modifier) {
-    var entries by remember { mutableStateOf<List<Pair<Channel, Program>>?>(null) }
-    LaunchedEffect(channels) {
-        entries = coroutineScope {
-            channels.map { ch ->
-                async {
-                    val login = loginFor(ch) ?: return@async emptyList()
-                    runCatching { GuideCache.get(login, ch) }.getOrDefault(emptyList()).map { ch to it }
-                }
-            }.awaitAll().flatten()
-        }
-    }
-    val now = rememberNow()
-    Box(modifier) {
-        val all = entries
-        when {
-            channels.isEmpty() -> Message("No sport channels yet. Sign in to your IPTV account, or tap ⋮ → Edit Sport list.")
-            all == null -> Loading()
-            else -> {
-                val soon = all.filter { (_, p) -> p.stop > now && p.start < now + 2 * 86_400 }.sortedWith(compareBy({ it.second.start }, { channels.indexOf(it.first) }))
-                if (soon.isEmpty()) Message("Your provider has no guide for these channels right now.")
-                else GuideList(
-                    soon.groupBy { Epg.dayLabel(it.second.start, now) }.map { (label, list) -> label to list.map { (ch, p) -> ch to p } },
-                    now,
-                    onPick = { ch, p -> if (ch != null) { if (p.isOn(now)) onPlay(ch) else onNotYet(ch, p) } },
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun GuideList(days: List<Pair<String, List<Pair<Channel?, Program>>>>, now: Long, onPick: (Channel?, Program) -> Unit) {
     val first = remember { FocusRequester() }

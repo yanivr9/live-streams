@@ -1,6 +1,6 @@
 {
-  "versionCode": 64,
-  "versionName": "3.43",
+  "versionCode": 65,
+  "versionName": "3.44",
   "apk": "StreamDesk.apk",
-  "notes": "New logins start with live channels only and the Hebrew folders (a login from a link turned on movies and series)."
+  "notes": "The TV guide is on every channel (now, next and a progress bar) and in the player banner; the Guide tab is gone. TV tiles fit the screen on every TV box; each tab opens at its top."
 }

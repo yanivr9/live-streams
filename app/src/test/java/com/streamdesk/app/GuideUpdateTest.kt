@@ -85,4 +85,18 @@ class GuideUpdateTest {
         assertEquals(listOf("4K", "4K", "Full HD", "HD"), picked.map { it.group })
         assertEquals(true, picked.all { it.logo.startsWith("file:///android_asset/logos/") })
     }
+
+    @Test
+    fun nowAndNextForEachChannel() {
+        val list = listOf(Program("Match", 1000, 2000), Program("Studio", 2000, 3000))
+        val air = NowNext.of(list, 1500) { "t$it" }!!
+        assertEquals("Match · until t2000", air.now)
+        assertEquals("t2000 Studio", air.next)
+        assertEquals(0.5f, air.progress!!, 0.001f)
+        // Between programs: only what's next
+        val gap = NowNext.of(listOf(Program("Later", 5000, 6000)), 4000) { "t$it" }!!
+        assertNull(gap.now)
+        assertEquals("t5000 Later", gap.next)
+        assertNull(NowNext.of(emptyList(), 1500))
+    }
 }

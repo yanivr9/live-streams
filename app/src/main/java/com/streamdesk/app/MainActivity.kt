@@ -118,6 +118,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.ColumnScope
@@ -136,6 +137,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -232,47 +234,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * "What's on now" for the whole app session. The downloads run outside the screen, so rotating the phone or reopening
- * the app doesn't throw away a download halfway and start it again; within 3 minutes the labels are simply reused.
- */
-private object NowOnCache {
-    private const val FRESH_MS = 3 * 60_000L
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val _labels = MutableStateFlow<Map<String, String>>(emptyMap())
-    val labels: StateFlow<Map<String, String>> = _labels
-    private var asked: Set<String> = emptySet()   // the channels the labels were fetched for
-    private var at = 0L
-    private var running: Job? = null
-    private var runningFor: Set<String> = emptySet()
-
-    /** Fetches the labels for these channels (link → login) unless they're fresh or already on their way. */
-    @Synchronized
-    fun ensure(channels: List<Pair<String, XtreamLogin>>) {
-        val urls = channels.mapTo(HashSet()) { it.first }
-        if (urls.isEmpty()) return
-        if (asked.containsAll(urls) && System.currentTimeMillis() - at < FRESH_MS) return
-        if (running?.isActive == true && runningFor == urls) return
-        running?.cancel()
-        runningFor = urls
-        running = scope.launch {
-            // A few channels at a time instead of one after another
-            val result = channels.chunked(6).flatMap { batch ->
-                coroutineScope {
-                    batch.map { (url, login) ->
-                        async {
-                            val programs = runCatching { Epg.load(login, url) }.getOrDefault(emptyList())
-                            Epg.nowLabel(programs, System.currentTimeMillis() / 1000)?.let { url to it }
-                        }
-                    }.awaitAll()
-                }
-            }.filterNotNull().toMap()
-            synchronized(this@NowOnCache) { asked = urls; at = System.currentTimeMillis() }
-            _labels.value = result
-        }
-    }
-}
-
 /** The shortest time the logo stays on screen when the app opens. */
 private const val SPLASH_MIN_MS = 700L
 
@@ -280,7 +241,7 @@ private const val SPLASH_MIN_MS = 700L
 private const val STARTUP_QUIET_MS = 1_500L
 
 private enum class Section(val label: String) {
-    All("All"), Sport("Sport"), Israel("Israeli TV"), Guide("Guide"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
+    All("All"), Sport("Sport"), Israel("Israeli TV"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
 }
 
 private sealed interface HomeDialog {
@@ -557,17 +518,9 @@ private fun HomeScreen(
         if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
     }
     val israelPicked = remember(scoped, deviceQuality) { IsraelList.pick(scoped, deviceQuality) }
-    // What's on now, from the provider's guide; kept for the app session and refreshed every 3 minutes
-    val guide by NowOnCache.labels.collectAsState()
-    LaunchedEffect(sportPicked, israelPicked, sources) {
-        if (guide.isEmpty()) delay(STARTUP_QUIET_MS)
-        val channels = (sportPicked + israelPicked).distinctBy { it.url }
-            .mapNotNull { ch -> sources.firstOrNull { it.url == ch.source }?.xtream?.let { ch.url to it } }
-        while (true) {
-            NowOnCache.ensure(channels)   // does nothing while the labels are fresh
-            delay(30_000)
-        }
-    }
+    // The guide on every channel: each row or tile asks for its own now/next as it shows (see NowOn)
+    val guides by NowOn.guides.collectAsState()
+    val nowSeconds = rememberNowSeconds()
     val groups = remember(scoped, section) {
         if (section == Section.Sport || section == Section.Israel) emptyList() else scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
     }
@@ -581,7 +534,7 @@ private fun HomeScreen(
                 val saved = channels.associateBy { it.url }
                 recent.map { saved[it.url] ?: it }.filter { kindFilter == null || it.kind in kindFilter!!.kinds }
             }
-            Section.Playlists, Section.Guide -> emptyList()
+            Section.Playlists -> emptyList()
         }
         base.filter {
             (group == null || it.group == group) &&
@@ -837,16 +790,6 @@ private fun HomeScreen(
             }
 
             Column(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnScroll).then(swipeToTab)) {
-            if (section == Section.Guide) {
-                SportGuidePane(
-                    channels = sportPicked,
-                    loginFor = ::loginFor,
-                    onPlay = ::playSport,
-                    onNotYet = { ch, p -> notify("“${p.title}” starts at ${Epg.clock(p.start)} on ${ch.displayName()}.") },
-                    modifier = Modifier.weight(1f),
-                )
-                return@Column
-            }
             if (section == Section.Playlists) {
                 PlaylistsPane(
                     sources = sources,
@@ -935,7 +878,10 @@ private fun HomeScreen(
                 // The tiles are sized so exactly [tileCount] fit on the screen: the rows share the height
                 BoxWithConstraints(Modifier.weight(1f)) {
                     val gap = 12.dp
-                    val rowHeight = ((maxHeight - 8.dp - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(110.dp)
+                    // The rows share the height exactly (the scaled tile still fits), so no row is cut off at the edges
+                    val rowHeight = ((maxHeight - 8.dp - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
+                // Each tab (and folder) opens at its own top, not where the previous tab was scrolled to
+                key(section, group, sourceFilter) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(tileCount.columns),
                     modifier = Modifier.fillMaxSize(),
@@ -944,6 +890,8 @@ private fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                        // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
+                        LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
                         ChannelTile(
                             modifier = (if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier).height(rowHeight),
                             channel = ch,
@@ -959,16 +907,20 @@ private fun HomeScreen(
                             onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
                             onRemove = { if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url) },
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
-                            nowOn = guide[ch.url],
+                            onAir = NowNext.of(guides[ch.url], nowSeconds),
                             onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
                             fillHeight = true,
                         )
                     }
                 }
                 }
+                }
             } else {
+                key(section, group, sourceFilter) {
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                        // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
+                        LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
                         ChannelRow(
                             modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
                             channel = ch,
@@ -993,11 +945,12 @@ private fun HomeScreen(
                                 if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url)
                             },
                             removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
-                            nowOn = guide[ch.url],
+                            onAir = NowNext.of(guides[ch.url], nowSeconds),
                             onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
+                }
                 }
             }
             }
@@ -1410,7 +1363,7 @@ private fun ChannelRow(
     onPlayOnTv: (() -> Unit)?,
     onRemove: () -> Unit,
     removeLabel: String,
-    nowOn: String? = null,
+    onAir: NowNext? = null,
     onGuide: (() -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
@@ -1427,16 +1380,33 @@ private fun ChannelRow(
         leadingContent = { ChannelBadge(channel, number) },
         headlineContent = { Text(channel.displayName(), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
-            // Channels from a playlist or login have long stream addresses with account details: show only the folder
-            val detail = nowOn ?: if (channel.source.isNotEmpty()) channel.group else listOf(channel.group, channel.url).filter { it.isNotBlank() }.joinToString(" · ")
-            if (detail.isNotBlank()) {
-                Text(
-                    detail,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = if (nowOn != null || channel.source.isNotEmpty()) FontFamily.Default else FontFamily.Monospace,
-                )
+            val soft = if (lit) FocusInkSoft else MaterialTheme.colorScheme.onSurfaceVariant
+            if (onAir != null) {
+                // The guide: what's on now (and how far it has got), and what's next
+                Column {
+                    onAir.now?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) }
+                    onAir.progress?.let {
+                        LinearProgressIndicator(
+                            progress = { it },
+                            color = if (lit) FocusInk else Amber,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.padding(vertical = 3.dp).fillMaxWidth(0.6f).height(2.dp),
+                        )
+                    }
+                    onAir.next?.let { Text("Next: $it", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = soft) }
+                }
+            } else {
+                // Channels from a playlist or login have long stream addresses with account details: show only the folder
+                val detail = if (channel.source.isNotEmpty()) channel.group else listOf(channel.group, channel.url).filter { it.isNotBlank() }.joinToString(" · ")
+                if (detail.isNotBlank()) {
+                    Text(
+                        detail,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = if (channel.source.isNotEmpty()) FontFamily.Default else FontFamily.Monospace,
+                    )
+                }
             }
         },
         trailingContent = {
@@ -1501,7 +1471,7 @@ private fun EmptyState(section: Section, filtered: Boolean) {
         section == Section.Recent -> "Channels you play will show up here."
         section == Section.Israel -> "No Israeli channels found. They show up here once your account has Channel 11, 12, 13, 14 or 15."
         section == Section.Sport -> "No sport channels found. Tap ⋮ → Edit Sport list to choose which channels appear here."
-        section == Section.Playlists || section == Section.Guide -> ""
+        section == Section.Playlists -> ""
         else -> "No channels yet. Paste a stream link above, or import an M3U playlist with the + button."
     }
     Text(

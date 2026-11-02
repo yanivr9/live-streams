@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -84,7 +85,7 @@ fun ChannelTile(
     onRemove: () -> Unit,
     removeLabel: String,
     modifier: Modifier = Modifier,
-    nowOn: String? = null,
+    onAir: NowNext? = null,
     onGuide: (() -> Unit)? = null,
     fillHeight: Boolean = false,
 ) {
@@ -127,7 +128,7 @@ fun ChannelTile(
             .background(if (focused) FocusCard else MaterialTheme.colorScheme.surfaceContainer, shape)
             .clip(shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (heldOpen) heldOpen = false else onClick() }
-            .padding(10.dp),
+            .padding(8.dp),
     ) {
         Column(if (fillHeight) Modifier.fillMaxSize() else Modifier) {
             Box(
@@ -151,29 +152,40 @@ fun ChannelTile(
                         model = channel.logo,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp),
                         onSuccess = { logoShown = true },
                         onError = { logoShown = false },
                     )
                 }
             }
+            // Small type, so the logo keeps most of the tile even with three rows on a TV
             Text(
                 channel.displayName(),
                 color = ink,
                 fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 5.dp),
             )
+            // The guide: what's on now with a thin bar for how far it has got; what's next on the tile the remote is on
             val detail = if (channel.source.isNotEmpty() || channel.url.isBlank()) channel.group else channel.group.ifBlank { "" }
+            val line = when {
+                focused && onAir?.next != null -> "Next: ${onAir.next}"
+                onAir?.now != null -> onAir.now
+                else -> detail
+            }
             Text(
-                (nowOn ?: detail).ifBlank { " " },
+                line.ifBlank { " " },
                 color = soft,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val progress = onAir?.progress
+            Box(Modifier.padding(top = 3.dp).fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)).background(if (progress != null) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)) {
+                if (progress != null) Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(Amber))
+            }
         }
         if (channel.favorite) {
             Icon(

@@ -59,8 +59,6 @@ class PhoneScreensTest {
             compose.waitForIdle()
             compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists()
 
-            compose.onNodeWithText("Guide").performScrollTo().performClick()
-            compose.waitForIdle()
             compose.onNodeWithText("All").performScrollTo().performClick()   // the tab bar may have scrolled it out of view
             compose.waitForIdle()
             compose.onAllNodesWithText("YES SPORT 1 FHD")[0].assertExists()

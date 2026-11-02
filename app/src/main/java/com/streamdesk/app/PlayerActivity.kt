@@ -584,7 +584,15 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun showBanner() {
-        banner = "${index + 1} / ${queue.size}  ·  ${queue[index].displayName()}"
+        val ch = queue[index]
+        // The guide in the banner: what's on now and next (fetched now if this channel's isn't known yet)
+        store.sources.value.firstOrNull { it.url == ch.source }?.xtream?.let { NowOn.want(ch.url, it) }
+        val air = NowNext.of(NowOn.guides.value[ch.url], System.currentTimeMillis() / 1000)
+        banner = listOfNotNull(
+            "${index + 1} / ${queue.size}  ·  ${ch.displayName()}",
+            air?.now,
+            air?.next?.let { "Next: $it" },
+        ).joinToString("\n")
         bannerHandler.removeCallbacks(hideBanner)
         bannerHandler.postDelayed(hideBanner, if (isTv) 4000 else 2500)
     }
@@ -938,7 +946,7 @@ class PlayerActivity : ComponentActivity() {
                     text,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
