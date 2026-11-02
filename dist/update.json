@@ -1,6 +1,6 @@
 {
-  "versionCode": 58,
-  "versionName": "3.37",
+  "versionCode": 59,
+  "versionName": "3.38",
   "apk": "StreamDesk.apk",
-  "notes": "Fixes: black screen after turning the phone; a frozen stream now reconnects with the screen off; no 'Playing' notice when nothing plays."
+  "notes": "The channels screen on the phone stays upright; the player still turns for full-screen video."
 }

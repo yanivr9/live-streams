@@ -2,6 +2,7 @@ package com.streamdesk.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.SystemClock
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.net.Uri
@@ -158,6 +159,8 @@ class MainActivity : ComponentActivity() {
             splash.setKeepOnScreenCondition { SystemClock.uptimeMillis() - shownAt < SPLASH_MIN_MS }
         }
         super.onCreate(savedInstanceState)
+        // On a phone the channels screen stays upright; the player still turns for full-screen video
+        if (!isTelevision()) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
         val store = ChannelStore.get(this)
         if (savedInstanceState == null) importFromIntent(intent)
