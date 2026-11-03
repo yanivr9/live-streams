@@ -46,6 +46,7 @@ android {
             // The simulated Android's system files, from Google's copy of Maven Central (the main site often says "too many requests")
             System.getProperty("tvshots")?.let { dir -> it.systemProperty("tvshots", dir) }   // pictures of the TV screens, on request
             System.getProperty("qa")?.let { dir -> it.systemProperty("qa", dir) }   // QA walk-through pictures, on request
+            System.getProperty("compat")?.let { dir -> it.systemProperty("compat", dir) }   // compatibility-matrix pictures, on request
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
         }
     }
