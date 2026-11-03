@@ -112,12 +112,10 @@ fun ChannelTile(
             .fillMaxWidth()
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .then(
-                if (focused) Modifier
-                    .shadow(24.dp, shape, ambientColor = Color.White, spotColor = Color.White)
-                    .border(4.dp, Color.White, shape)
-                else Modifier
-            )
+            // Always the same modifiers, only their values change: adding or removing a modifier in front of the focus
+            // modifiers rebuilds them, and the tile would lose the remote's focus the moment it got it
+            .shadow(if (focused) 24.dp else 0.dp, shape, ambientColor = Color.White, spotColor = Color.White)
+            .border(4.dp, if (focused) Color.White else Color.Transparent, shape)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) { AppLog.i("keys", "  remote is on ${channel.displayName()}"); onFocused() }
@@ -245,7 +243,8 @@ fun TvTabBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modif
             Box(
                 Modifier
                     .padding(vertical = 6.dp)
-                    .then(if (focused) Modifier.shadow(12.dp, pill, ambientColor = Color.White, spotColor = Color.White).border(2.dp, Color.White, pill) else Modifier)
+                    .shadow(if (focused) 12.dp else 0.dp, pill, ambientColor = Color.White, spotColor = Color.White)
+                    .border(2.dp, if (focused) Color.White else Color.Transparent, pill)
                     .background(if (chosen) Amber else if (focused) FocusCard else Color.Transparent, pill)
                     .clip(pill)
                     .onFocusChanged { focused = it.isFocused }

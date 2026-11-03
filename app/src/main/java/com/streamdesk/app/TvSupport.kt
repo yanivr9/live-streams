@@ -167,12 +167,9 @@ object TvFocusIndication : IndicationNodeFactory {
 fun Modifier.tvFocusRing(shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.CircleShape): Modifier {
     if (!LocalIsTv.current) return this
     var focused by remember { mutableStateOf(false) }
+    // The same modifiers whether focused or not (only their colours change), so the focus isn't lost when it arrives
     return this
         .onFocusChanged { focused = it.hasFocus }
-        .then(
-            if (focused) Modifier
-                .border(3.dp, Color.White, shape)
-                .background(Color.White.copy(alpha = 0.22f), shape)
-            else Modifier
-        )
+        .border(3.dp, if (focused) Color.White else Color.Transparent, shape)
+        .background(if (focused) Color.White.copy(alpha = 0.22f) else Color.Transparent, shape)
 }
