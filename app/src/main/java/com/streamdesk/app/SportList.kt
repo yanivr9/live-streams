@@ -185,7 +185,9 @@ object SportList {
             val allowed = options.filter { it.second.score <= settings.cap.maxScore }
             // Nothing within the limit: take the lowest quality there is
             val (channel, quality) = if (allowed.isNotEmpty()) allowed.maxBy { it.second.score } else options.minBy { it.second.score }
-            channel.copy(name = entry.label, group = quality.label, logo = logoFor(entry) ?: channel.logo)
+            // The provider often gives a logo to one quality of a channel and none to the others: use whichever has one
+            val own = (listOf(channel) + options.map { it.first }).map { it.logo }.firstOrNull { it.startsWith("http") } ?: channel.logo
+            channel.copy(name = entry.label, group = quality.label, logo = logoFor(entry) ?: own)
         }
     }
 }

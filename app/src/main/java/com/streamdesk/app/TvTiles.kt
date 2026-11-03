@@ -147,7 +147,9 @@ fun ChannelTile(
                 // The number shows until the logo arrives (or for good if there is none); a plain AsyncImage is much
                 // cheaper than SubcomposeAsyncImage, which matters for drawing the first screen on a slow TV box
                 var logoShown by remember(channel.logo) { mutableStateOf(false) }
-                if (!logoShown) numberText()
+                // No logo at all: the channel's name on a coloured badge (one colour per brand: HOT, YES, Cellcom, …)
+                if (!logoShown && !hasLogo && channel.url.isNotBlank()) NameBadge(channel.displayName(), Modifier.fillMaxSize())
+                else if (!logoShown) numberText()
                 if (hasLogo) {
                     AsyncImage(
                         model = channel.logo,
@@ -240,5 +242,24 @@ fun TvTabBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modif
                 )
             }
         }
+    }
+}
+
+/** A stand-in logo: the channel's name in white on a colour picked from its first word, so HOT, YES, Cellcom… each look alike. */
+@Composable
+fun NameBadge(name: String, modifier: Modifier = Modifier) {
+    val brand = name.trim().substringBefore(' ').lowercase()
+    val colour = androidx.compose.ui.graphics.Color.hsv((brand.hashCode().mod(360)).toFloat(), 0.55f, 0.55f)
+    Box(modifier.background(colour), contentAlignment = Alignment.Center) {
+        Text(
+            name,
+            color = androidx.compose.ui.graphics.Color.White,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        )
     }
 }
