@@ -196,7 +196,7 @@ class TvScreensTest {
 }
 
 /** A small account like the real one: Sport and Israeli channels in several qualities, plus another channel. */
-private fun seedChannels(context: Context) {
+internal fun seedChannels(context: Context) {
     ChannelStore.resetForTests()
     val src = "http://test.invalid/player_api.php?username=u&password=p"
     val names = listOf(
