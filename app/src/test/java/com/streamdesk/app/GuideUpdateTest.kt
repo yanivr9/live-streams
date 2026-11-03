@@ -81,9 +81,28 @@ class GuideUpdateTest {
             ch("IL: Channel 14 HD"), ch("IL: Channel 14 HD"), ch("IL: Channel 120"), ch("IL: HOT Cinema"),
         )
         val picked = IsraelList.pick(provider)
-        assertEquals(listOf("Channel 11 · Kan", "Channel 12 · Keshet", "Channel 13 · Reshet", "Channel 14"), picked.map { it.name })   // no 15 at this provider
-        assertEquals(listOf("4K", "4K", "Full HD", "HD"), picked.map { it.group })
-        assertEquals(true, picked.all { it.logo.startsWith("file:///android_asset/logos/") })
+        // 11–14 first (no 15 at this provider), then the other channels; "Channel 120" and "HOT Cinema" aren't on the list
+        assertEquals(listOf("Channel 11 · Kan", "Channel 12 · Keshet", "Channel 13 · Reshet", "Channel 14", "Makan", "Kan 33"), picked.map { it.name })
+        assertEquals(listOf("4K", "4K", "Full HD", "HD", "Full HD", ""), picked.map { it.group })
+        assertEquals(true, picked.take(4).all { it.logo.startsWith("file:///android_asset/logos/") })
+    }
+
+    @Test
+    fun israeliTabHasTheOtherChannelsOnceEach() {
+        fun ch(name: String) = Channel("http://h/live/u/p/${name.hashCode()}.ts", name, "Hebrew")
+        val provider = listOf(
+            ch("Disney HD"), ch("Disney Jr"), ch("Disney"), ch("i 24 HD"), ch("i 24 Hebrew"), ch("i 24 English HD"),
+            ch("HOT Cinema 1 FHD"), ch("HOT Cinema 1 HD"), ch("HOT Cinema 1"), ch("YES TV Drama HD [Multi-Sub]"), ch("YES TV Drama FHD"),
+            ch("Cellcom TV Isreal"), ch("YES SPORT 1 FHD"), ch("Sport 5 FHD"),
+        )
+        val picked = IsraelList.pick(provider)
+        assertEquals(
+            listOf("i24 News", "i24 News English", "Disney", "Disney Jr", "YES TV Drama", "HOT Cinema 1", "Cellcom TV Israel"),
+            picked.map { it.name },
+        )
+        assertEquals("Full HD", picked.first { it.name == "HOT Cinema 1" }.group)
+        assertEquals("Full HD", picked.first { it.name == "YES TV Drama" }.group)
+        assertEquals(true, picked.none { it.name.contains("Sport", ignoreCase = true) })   // sport stays in its own tab
     }
 
     @Test

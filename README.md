@@ -38,7 +38,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 - **Swipe between tabs** (phone): drag left or right on the channels: they follow your finger, and when you let go the next or previous tab slides in (All, Sport, Israeli TV, Guide, …).
 - **Quality on this TV**: on a TV the tiles pick Full HD at most, because the Mi Box takes minutes to show a picture on these 4K streams. ⋮ → Quality on this TV switches 4K back on. 
 - **Slow start check**: a channel with no picture after 15 s is tried once more; then the app asks the provider how many screens are in use and says if another screen is playing.
-- **Israeli TV tab**: Channel 11 (Kan), 12, 13, 14 and 15, each with its logo and in the best quality, picked the same way as the Sport list. Channels the account doesn't have are left out.
+- **Israeli TV tab**: Channel 11 (Kan), 12, 13, 14 and 15 first, then every other Israeli channel the provider has (news, kids, movies, series, YES, HOT, FreeTV, Cellcom, Partner), each once in the best quality. Sport channels stay in the Sport tab. Channels the account doesn't have are left out.
 - **TV guide**: the Guide tab lists today's and tomorrow's programs on all Sport channels in time order (OK on a program
   that's on now plays it). Each IPTV channel's menu also has "TV guide" for its full schedule.
 - **Channels on screen** (TV): the home screen opens with 12 channel tiles (4 × 3) that fill the screen. ⋮ → Channels on screen cycles 6 / 9 / 12 / 15 / 20.

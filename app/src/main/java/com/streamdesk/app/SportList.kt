@@ -131,8 +131,7 @@ object SportList {
         }
 
     /** The quality of [channel] if it is the channel [pattern] (in any quality), otherwise null. */
-    private fun qualityIfMatches(channel: Channel, pattern: String): Quality? {
-        val name = channel.displayName().trim().uppercase()
+    private fun qualityIfMatches(name: String, pattern: String): Quality? {
         val quoted = pattern.trim()
         if (quoted.length > 2 && quoted.startsWith('"') && quoted.endsWith('"')) {   // "Sport 5 FHD": that channel only
             val exact = quoted.substring(1, quoted.length - 1).trim().uppercase()
@@ -177,9 +176,10 @@ object SportList {
     fun pick(channels: List<Channel>, settings: SportSettings): List<Channel> {
         val entries = parse(settings.text)
         if (entries.isEmpty()) return channels.filter { it.isSport() }
+        val names = channels.map { it.displayName().trim().uppercase() }   // once, not once per list line
         return entries.mapNotNull { entry ->
-            val options = channels.mapNotNull { c ->
-                entry.patterns.firstNotNullOfOrNull { qualityIfMatches(c, it) }?.let { c to it }
+            val options = channels.indices.mapNotNull { i ->
+                entry.patterns.firstNotNullOfOrNull { qualityIfMatches(names[i], it) }?.let { channels[i] to it }
             }
             if (options.isEmpty()) return@mapNotNull null
             val allowed = options.filter { it.second.score <= settings.cap.maxScore }
@@ -190,7 +190,11 @@ object SportList {
     }
 }
 
-/** The Israeli TV tab: the main Israeli channels, each in the best quality, picked the same way as the Sport list. */
+/**
+ * The Israeli TV tab: the main Israeli channels first (11–15), then every other Hebrew channel the provider has
+ * (news, kids, movies, series, YES, HOT, FreeTV, Cellcom, Partner), each once in the best quality. The sport
+ * channels stay in the Sport tab.
+ */
 object IsraelList {
     private val SETTINGS = SportSettings(
         """
@@ -199,6 +203,174 @@ object IsraelList {
         Channel 13 · Reshet = Channel 13
         Channel 14 = Channel 14
         Channel 15 = Channel 15
+        Makan = Makan
+        Channel 9 = Channel 9
+        Channel 20 = Channel 20
+        Channel 23 = Channel 23
+        Channel 24 = Channel 24
+        Kan 33 = Kan33
+        Knesset = Knesset
+        i24 News = i 24 | i 24 Hebrew
+        i24 News English = i 24 English
+        i24 News Arabic = i 24 Arabic
+        i24 News Français = i 24 Francais
+        Yam Tihoni = Yam Tihoni
+        Hala TV = Hala TV
+        Zoom = Zoom
+        Viva = VIVA
+        Viva Plus = VIVA Plus
+        Viva Telenovelas = Viva Telenovelas
+        Viva Istanbul = Viva Istanbul
+        Walla+ = Walla+
+        Classic = Classic
+        Home Plus = Home Plus
+        Israel Cinema = Isreal Cinema
+        Israel Zero = Isreal Zero
+        Erez Nehederet = Erez Nehederet
+        Game Show = Game Show
+        Reality = Reality
+        Together = Together
+        Savri = Savri
+        Starz = Starz
+        The Humor Channel = The Humor Channel
+        Israel Shopping Channel = Israel Shopping Channel
+        Fashion Israel = Fashion Isreal
+        Good Life = GoodLife
+        GTV = GTV
+        IETV = IETV
+        Fomo = Fomo
+        Karaoke = Karaoke
+        Hatunami POPUP = Hatunami POPUP
+        Next Star POPUP = Next Star POPUP
+        Ninja POPUP = Ninja POPUP
+        Health Channel = Health Channel
+        Hidabroot = Hidabroot Channel
+        JLTV = JLTV
+        Me TV = Me TV
+        Music IL = Music IL
+        MTV Israel = MTV Isreal
+        MTV Hits = MTV Hits
+        VH1 = VH1
+        VH1 Classic = VH1 Classic
+        Trace Sport Stars = Trace Spôrt Stars
+        Bollywood = Bollywood
+        Bollywood Cinema India = Bollywood Cinema India
+        Bollywood Serial = Bollywood Serial
+        Big Brother 26 = Big Brother 26
+        Turkish Dramas = Turkish Dramas
+        Turkish Dramas 2 = Turkish Dramas 2
+        A+ Kids = A+ Kids
+        A Plus = A Plus
+        Baby = Baby
+        Baby TV = Baby TV
+        HOP Pele = HOP Pele
+        HOP = HOP
+        HOP Yaldut = HOP YALDUT
+        Junior = Junior
+        Kids Channel = Kids Channel
+        Logi = logi
+        Yalduti = Yalduti
+        Yalduti Songs = Yalduti Songs
+        YOYO = YOYO
+        Luli = Luli
+        Yes Wiz = Yes Wiz
+        Disney = Disney
+        Disney Jr = Disney Jr
+        Nickelodeon = Nickelodeon
+        Nick Jr = Nick Jr
+        NickTeen = NickTeen
+        Animal Planet = Animal planet
+        BBC Entertainment = BBC entertainement
+        Discovery = Discovery
+        DIY Channel = DIY Channel
+        E! Entertainment = E! Entertainment
+        Food Channel = Food Channel
+        Food Network = Food Network
+        Fox Business = Fox Business
+        History = History
+        ID = ID
+        Investigation Discovery = Investigation Discovery
+        Lifetime = Lifetime
+        National Geo Wild = National Geo Wild
+        National Geographic = National Geographic
+        TLC = TLC
+        Travel Channel = Travel Channel
+        Travel = Travel
+        YES TV Action = YES TV Action
+        YES TV Comedy = YES TV Comedy
+        YES TV Drama = YES TV Drama
+        YES Movies Action = YES Movies Action
+        YES Movies Kids = YES Movies Kids
+        YES Movies Drama = YES Movies Drama
+        YES Movies Comedy = YES Movies Comedy
+        YES Docu = YES Docu
+        YES Cinema = YES Cinema
+        YES+ Diamonds = YES+ Diamonds
+        YES+ Cinema = YES+ Cinema
+        YES Action World 1 = YES Action World 1
+        YES Action World 2 = YES Action World 2
+        YES PopUp = YES PopUp
+        HOT 3 = HOT 3
+        HOT 8 = HOT 8
+        HOT Real = HOT REAL
+        HOT Zone = HOT ZONE
+        HOT D = HOT D
+        HOT Cinema 1 = HOT Cinema 1
+        HOT Cinema 2 = HOT Cinema 2
+        HOT Cinema 3 = HOT Cinema 3
+        HOT Cinema 4 = HOT Cinema 4
+        HOT Cinema Family = HOT Cinema Family
+        HOT Comedy Central = HOT Comedy Central
+        HOT Bidur = HOT Bidur
+        HOT Bollywood = HOT Bollywood
+        HOT Bollyshow = HOT Bollyshow
+        HOT Design = HOT Design
+        HOT Kidz = HOT Kidz
+        HOT Nofesh = HOT Nofesh
+        HOT Reality = HOT Reality
+        HOT Style = HOT Style
+        HOT Buzz = HOT Buzz
+        HOT Turkish Drama 1 = HOT Turkish Drama 1
+        HOT Turkish Drama 2 = HOT Turkish Drama 2
+        HOT Turkish Drama 3 = HOT Turkish Drama 3
+        HOT Vamos = HOT Vamos
+        HOT Viva Premium = HOT Viva Premium
+        HOT Viva Vintage = HOT Viva Vintage
+        HOT Yam Tichoni = HOT Yam Tichoni
+        HOT Yam Tichoni Plus = HOT Yam Tichoni plus
+        HOT Zoom Toom = HOT Zoom Toom
+        FreeTV Asuta Doc = FreeTV Asuta Doc
+        FreeTV Series Global = FreeTV Series Global
+        FreeTV Israeli Movies = FreeTV Israeli Movies
+        FreeTV Movies 10 Stars = FreeTV Movies 10 Stars
+        FreeTV Movies Action = FreeTV Movies Action
+        FreeTV Movies Comedy = FreeTV Movies Comedy
+        FreeTV Movies Drama = FreeTV Movies Drama
+        FreeTV Movies Family = FreeTV Movies Family
+        FreeTV Movies Horror = FreeTV Movies Horror
+        FreeTV Movies Romance = FreeTV Movies Romance
+        FreeTV Imagin Comedy = FreeTV Imagin Comedy
+        FreeTV Imagin Cooking = FreeTV Imagin Cooking
+        FreeTV Imagin Doco = FreeTV Imagin Doco
+        FreeTV Imagin Drama = FreeTV Imagin Drama
+        FreeTV Imagin Lifestyle = FreeTV Imagin lifestyle
+        Cellcom TV Docu = Cellcom TV Docu
+        Cellcom TV Family = Cellcom TV Family
+        Cellcom TV Foody = Cellcom TV Foody
+        Cellcom TV HBO = Cellcom TV HBO
+        Cellcom TV Israel = Cellcom TV Isreal
+        Cellcom TV Kids = Cellcom TV Kids
+        Cellcom TV Movies = Cellcom TV Movies
+        Cellcom TV Now = Cellcom TV Now
+        Cellcom TV Show = Cellcom TV Show
+        Cellcom TV YLD = Cellcom TV YLD
+        Cellcom TV Drama = Cellcom TV Drama
+        Cellcom TV Yvin = Cellcom TV Yvin
+        Partner TV Comedy = Partner TV Comedy
+        Partner TV Kids = Partner TV Kids
+        Partner TV Movies = Partner TV Movies
+        Partner TV Netflix = Partner TV Netflix
+        Partner TV Series = Partner TV Series
         """.trimIndent(),
         QualityCap.Best,
     )
