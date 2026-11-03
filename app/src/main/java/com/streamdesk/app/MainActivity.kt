@@ -189,6 +189,10 @@ class MainActivity : ComponentActivity() {
     // Same lint exception as the player: this is an app's own activity, not a library
     @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_ESCAPE) {   // Esc on a keyboard goes back, like the Back key
+            if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0) onBackPressedDispatcher.onBackPressed()
+            return true
+        }
         if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0 && isTelevision()) {
             AppLog.i("keys", "Remote key: ${android.view.KeyEvent.keyCodeToString(event.keyCode)}")
         }

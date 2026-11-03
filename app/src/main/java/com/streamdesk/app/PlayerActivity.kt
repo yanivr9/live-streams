@@ -601,6 +601,10 @@ class PlayerActivity : ComponentActivity() {
     // Overriding here (not onKeyDown) catches the keys before any view does; lint's restriction is meant for library authors.
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_ESCAPE) {   // Esc on a keyboard goes back, like the Back key
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) onBackPressedDispatcher.onBackPressed()
+            return true
+        }
         if (isTv && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             AppLog.i("keys", "Remote key: ${KeyEvent.keyCodeToString(event.keyCode)}")   // to see which keys a TV's remote passes on
         }
@@ -898,6 +902,16 @@ class PlayerActivity : ComponentActivity() {
                         if (isTv) {   // the remote is handled by the activity, not by the view
                             isFocusable = false
                             isFocusableInTouchMode = false
+                            // A mouse on the TV: click = OK (channel list, or try again after an error), wheel = channel up / down
+                            setOnClickListener {
+                                if (status?.isError == true) play(index) else if (queue.size > 1) listOpen = true else showBanner()
+                            }
+                            setOnGenericMotionListener { _, e ->
+                                if (e.actionMasked == android.view.MotionEvent.ACTION_SCROLL && !listOpen && queue.size > 1 && castTarget == null) {
+                                    zap(if (e.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL) > 0) 1 else -1)
+                                    true
+                                } else false
+                            }
                         }
                         keepScreenOn = true
                         setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
