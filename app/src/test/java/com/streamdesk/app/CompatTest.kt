@@ -86,8 +86,9 @@ class CompatMatrixTest(private val name: String, private val qualifiers: String,
             sc.onActivity { assertTrue(it.isTelevision() == tv) }
             compose.onAllNodesWithText("Sport 1")[0].assertExists()
             shot("1-sport")
-            compose.onNodeWithText("Israeli TV").performScrollToIfPhone(tv).performClick(); settle()
-            compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists()
+            // The TV has Sport, Favorites and All; phones also have Israeli TV
+            if (tv) { compose.onNodeWithText("All").performClick(); settle(); compose.onAllNodesWithText("YES SPORT 1 FHD")[0].assertExists() }
+            else { compose.onNodeWithText("Israeli TV").performScrollToIfPhone(tv).performClick(); settle(); compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists() }
             shot("2-israeli")
         }
     }

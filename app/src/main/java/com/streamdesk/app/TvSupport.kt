@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -159,4 +160,19 @@ object TvFocusIndication : IndicationNodeFactory {
             }
         }
     }
+}
+
+/** On a TV: a white ring and a light fill around whatever the remote is on (icon buttons have no highlight of their own). */
+@Composable
+fun Modifier.tvFocusRing(shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.CircleShape): Modifier {
+    if (!LocalIsTv.current) return this
+    var focused by remember { mutableStateOf(false) }
+    return this
+        .onFocusChanged { focused = it.hasFocus }
+        .then(
+            if (focused) Modifier
+                .border(3.dp, Color.White, shape)
+                .background(Color.White.copy(alpha = 0.22f), shape)
+            else Modifier
+        )
 }

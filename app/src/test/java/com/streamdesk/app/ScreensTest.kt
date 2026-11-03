@@ -10,6 +10,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 
 import androidx.compose.ui.test.performScrollToNode
@@ -184,9 +185,11 @@ class TvScreensTest {
             compose.waitForIdle()
             scenario.onActivity { assertTrue(it.isTelevision()) }
             compose.onAllNodesWithText("Sport 1")[0].assertExists()
-            compose.onNodeWithText("Israeli TV").performClick()
+            // The TV has only Sport, Favorites and All
+            compose.onAllNodesWithText("Israeli TV").assertCountEquals(0)
+            compose.onNodeWithText("All").performClick()
             compose.waitForIdle()
-            compose.onAllNodesWithText("Channel 13 · Reshet")[0].assertExists()
+            compose.onAllNodesWithText("Channel 13 FHD")[0].assertExists()
             compose.onNodeWithContentDescription("More options").performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Channels on screen: 12").assertExists()

@@ -56,7 +56,7 @@ class TvLookTest {
                 }
             }
             shot("1-sport")
-            compose.onNodeWithText("Israeli TV").performClick(); shot("2-israeli-tv")
+            compose.onNodeWithText("Favorites").performClick(); shot("2-favorites")
             compose.onNodeWithText("All").performClick(); shot("3-all")
         }
     }

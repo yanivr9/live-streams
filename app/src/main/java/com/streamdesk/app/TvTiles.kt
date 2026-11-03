@@ -103,7 +103,7 @@ fun ChannelTile(
     val ink = MaterialTheme.colorScheme.onSurface
     val soft = MaterialTheme.colorScheme.onSurfaceVariant
     // "Glow": the tile the remote is on stays dark, grows a little and gets a white frame with a soft white glow
-    val scale by animateFloatAsState(if (focused) 1.07f else 1f, label = "tile scale")
+    val scale by animateFloatAsState(if (focused) 1.08f else 1f, label = "tile scale")
     val hasLogo = channel.logo.startsWith("http") || channel.logo.startsWith("file:///android_asset/")
 
     Box(
@@ -113,8 +113,8 @@ fun ChannelTile(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .then(
                 if (focused) Modifier
-                    .shadow(20.dp, shape, ambientColor = Color.White, spotColor = Color.White)
-                    .border(3.dp, Color.White, shape)
+                    .shadow(24.dp, shape, ambientColor = Color.White, spotColor = Color.White)
+                    .border(4.dp, Color.White, shape)
                 else Modifier
             )
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }

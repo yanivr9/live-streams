@@ -653,17 +653,17 @@ private fun HomeScreen(
 
     val topActions: @Composable RowScope.() -> Unit = {
                     if (LocalIsTv.current) {
-                        IconButton(onClick = { dialog = HomeDialog.LinkPhone }) {
+                        IconButton(onClick = { dialog = HomeDialog.LinkPhone }, modifier = Modifier.tvFocusRing()) {
                             Icon(Icons.Default.Cast, contentDescription = "Link a phone")
                         }
                     }
                     Box {
-                        IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }) {
+                        IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }, modifier = Modifier.tvFocusRing()) {
                             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
                         }
                     }
                     Box {
-                        IconButton(onClick = { moreMenu = true }) {
+                        IconButton(onClick = { moreMenu = true }, modifier = Modifier.tvFocusRing()) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
                         // On a TV the remote moves through a menu next to the button; on a phone the long list slides up
@@ -746,8 +746,8 @@ private fun HomeScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (isTv) {
                 // Just the red dot, not the name: the TV's width is needed for all the tabs
-                // Sport first, as it is what the TV is mostly used for; ▼ from the tabs always goes down to the first channel
-                val tvTabs = remember { listOf(Section.Sport, Section.Israel, Section.All, Section.Favorites, Section.Recent, Section.Playlists) }
+                // Only Sport, Favorites and All on a TV (Sport first, as it is what the TV is mostly used for); ▼ from the tabs always goes down to the first channel
+                val tvTabs = remember { listOf(Section.Sport, Section.Favorites, Section.All) }
                 Row(
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp).onPreviewKeyEvent { e ->
                         if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown && section != Section.Playlists && visible.isNotEmpty()) {
@@ -764,7 +764,7 @@ private fun HomeScreen(
                         onSelect = { section = tvTabs[it] },
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = { dialog = HomeDialog.Search }) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
+                    IconButton(onClick = { dialog = HomeDialog.Search }, modifier = Modifier.tvFocusRing()) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
                     topActions()
                 }
             }
