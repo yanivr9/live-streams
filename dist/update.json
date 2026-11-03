@@ -1,6 +1,6 @@
 {
-  "versionCode": 65,
-  "versionName": "3.44",
+  "versionCode": 66,
+  "versionName": "3.45",
   "apk": "StreamDesk.apk",
-  "notes": "The TV guide is on every channel (now, next and a progress bar) and in the player banner; the Guide tab is gone. TV tiles fit the screen on every TV box; each tab opens at its top."
+  "notes": "On the TV, the channels scroll a whole row at a time, so the screen no longer jumps."
 }

@@ -88,6 +88,7 @@ fun ChannelTile(
     onAir: NowNext? = null,
     onGuide: (() -> Unit)? = null,
     fillHeight: Boolean = false,
+    onFocused: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -116,7 +117,7 @@ fun ChannelTile(
                     .border(3.dp, Color.White, shape)
                 else Modifier
             )
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
             .onPreviewKeyEvent { e ->
                 val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
                 if (e.type == KeyEventType.KeyDown && ok && e.nativeKeyEvent.repeatCount == 1) {

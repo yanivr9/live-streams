@@ -89,6 +89,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.shape.CircleShape
@@ -882,7 +883,9 @@ private fun HomeScreen(
                     val rowHeight = ((maxHeight - 8.dp - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
                 // Each tab (and folder) opens at its own top, not where the previous tab was scrolled to
                 key(section, group, sourceFilter) {
+                val gridState = rememberLazyGridState()
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(tileCount.columns),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
@@ -893,6 +896,15 @@ private fun HomeScreen(
                         // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
                         LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
                         ChannelTile(
+                            // The grid moves a whole row at a time, keeping the row the remote is on in the middle: the tiles
+                            // never end up half off the screen, and the picture doesn't jump by uneven amounts
+                            onFocused = {
+                                val columns = tileCount.columns
+                                val firstRow = ((i / columns) - (tileCount.rows - 1) / 2).coerceAtLeast(0)
+                                if (gridState.firstVisibleItemIndex / columns != firstRow || gridState.firstVisibleItemScrollOffset != 0) {
+                                    scope.launch { gridState.animateScrollToItem(firstRow * columns) }
+                                }
+                            },
                             modifier = (if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier).height(rowHeight),
                             channel = ch,
                             number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
