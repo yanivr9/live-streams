@@ -567,7 +567,8 @@ private fun HomeScreen(
     var tvMenuSignal by remember { mutableIntStateOf(0) }
     var tvOkDown by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    val tabRequesters = remember { List(3) { FocusRequester() } }
+    val tvTabs = remember { listOf(Section.Sport, Section.Israel, Section.Favorites, Section.All) }
+    val tabRequesters = remember { List(tvTabs.size) { FocusRequester() } }
     LaunchedEffect(section, group, sourceFilter, query) { tvSelected = 0; tvInGrid = true }
 
     val isTvMenu = LocalIsTv.current
@@ -722,7 +723,7 @@ private fun HomeScreen(
                         if (up != null) tvSelected = up
                         else {
                             tvInGrid = false
-                            val tab = when (tvSection) { Section.Favorites -> 1; Section.All -> 2; else -> 0 }
+                            val tab = tvTabs.indexOf(tvSection).coerceAtLeast(0)
                             runCatching { tabRequesters[tab].requestFocus() }
                         }
                     }
@@ -811,8 +812,7 @@ private fun HomeScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (isTv) {
                 // Just the red dot, not the name: the TV's width is needed for all the tabs
-                // Only Sport, Favorites and All on a TV (Sport first, as it is what the TV is mostly used for)
-                val tvTabs = remember { listOf(Section.Sport, Section.Favorites, Section.All) }
+                // The TV's tabs: Sport first, as it is what the TV is mostly used for
                 Row(
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,

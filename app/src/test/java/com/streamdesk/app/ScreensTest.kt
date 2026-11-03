@@ -185,11 +185,11 @@ class TvScreensTest {
             compose.waitForIdle()
             scenario.onActivity { assertTrue(it.isTelevision()) }
             compose.onAllNodesWithText("Sport 1")[0].assertExists()
-            // The TV has only Sport, Favorites and All
-            compose.onAllNodesWithText("Israeli TV").assertCountEquals(0)
-            compose.onNodeWithText("All").performClick()
+            // The TV's tabs: Sport, Israeli TV, Favorites, All (no Recent or Playlists)
+            compose.onAllNodesWithText("Recent").assertCountEquals(0)
+            compose.onNodeWithText("Israeli TV").performClick()
             compose.waitForIdle()
-            compose.onAllNodesWithText("Channel 13 FHD")[0].assertExists()
+            compose.onAllNodesWithText("Channel 13 · Reshet")[0].assertExists()
             compose.onNodeWithContentDescription("More options").performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Channels on screen: 12").assertExists()
