@@ -221,7 +221,9 @@ class ChannelStore private constructor(context: Context) {
      */
     private suspend fun loadXtream(source: PlaylistSource, onProgress: (String) -> Unit): Int {
         val url = source.url
-        val login = source.xtream!!
+        // A TV box shows live channels: movies and series are tens of thousands of items (30 MB of lists) that a Mi Box
+        // struggles to hold, so a TV never downloads them, whatever the login says
+        val login = source.xtream!!.let { if (appContext.isTelevision()) it.copy(movies = false, series = false) else it }
         val old = _channels.value.filter { it.source == url }
         val pending = buildSet {
             if (login.live) add(Kind.LIVE)
