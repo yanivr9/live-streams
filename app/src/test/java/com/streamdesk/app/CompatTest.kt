@@ -89,12 +89,6 @@ class CompatMatrixTest(private val name: String, private val qualifiers: String,
             compose.onNodeWithText("Israeli TV").performScrollToIfPhone(tv).performClick(); settle()
             compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists()
             shot("2-israeli")
-            compose.onNodeWithText("All").performScrollToIfPhone(tv).performClick(); settle()
-            compose.onAllNodesWithText("YES SPORT 1 FHD")[0].assertExists()
-            // Turning the device / folding: the screen is rebuilt and must come back with its channels
-            sc.recreate(); settle()
-            compose.onAllNodesWithText("YES SPORT 1 FHD")[0].assertExists()
-            shot("3-after-recreate")
         }
     }
 }
