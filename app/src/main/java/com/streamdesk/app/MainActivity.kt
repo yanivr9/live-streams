@@ -57,6 +57,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
@@ -174,23 +177,36 @@ class MainActivity : ComponentActivity() {
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // The logo shows straight away while the app starts, and stays long enough to be seen. Only on a real start:
-        // holding it again when the screen is rebuilt (e.g. after turning the phone) can leave the screen black.
-        val splash = installSplashScreen()
-        if (savedInstanceState == null) {
-            val shownAt = SystemClock.uptimeMillis()
-            splash.setKeepOnScreenCondition { SystemClock.uptimeMillis() - shownAt < SPLASH_MIN_MS }
-        }
+        installSplashScreen()   // the system's logo screen, until the first frame below takes over
         super.onCreate(savedInstanceState)
         // On a phone the channels screen stays upright; the player still turns for full-screen video
         if (!isTelevision() && resources.configuration.smallestScreenWidthDp < 600) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
-        val store = ChannelStore.get(this)
-        if (savedInstanceState == null) importFromIntent(intent)
-        val crash = App.takeCrashReport(this)
-        if (savedInstanceState == null && isTelevision() && intent.action == Intent.ACTION_MAIN && Resume.enabled(this)) resumeLast(store)
+        val firstStart = savedInstanceState == null
         setContent {
-            StreamDeskTheme(isTv = isTelevision()) { HomeScreen(store, ::openPlayer, crash, invite) { invite = null } }
+            StreamDeskTheme(isTv = isTelevision()) {
+                // The loading screen is the first thing drawn; the heavy part (reading the saved channels, building the
+                // home screen) starts after that frame, so the screen is never just black while the app starts
+                var home by remember { mutableStateOf<(@Composable () -> Unit)?>(null) }
+                var ready by remember { mutableStateOf(false) }
+                val shownAt = remember { SystemClock.uptimeMillis() }
+                LaunchedEffect(Unit) {
+                    withFrameNanos { }
+                    val store = ChannelStore.get(this@MainActivity)
+                    if (firstStart) importFromIntent(intent)
+                    val crash = App.takeCrashReport(this@MainActivity)
+                    if (firstStart && isTelevision() && intent.action == Intent.ACTION_MAIN && Resume.enabled(this@MainActivity)) resumeLast(store)
+                    home = { HomeScreen(store, ::openPlayer, crash, invite) { invite = null } }
+                    withFrameNanos { }
+                    // Long enough to be seen on a real start; at once when the screen is only rebuilt (turning the device)
+                    if (firstStart) delay((LAUNCH_MIN_MS - (SystemClock.uptimeMillis() - shownAt)).coerceAtLeast(0))
+                    ready = true
+                }
+                Box(Modifier.fillMaxSize()) {
+                    home?.invoke()
+                    AnimatedVisibility(visible = !ready, exit = fadeOut(tween(350))) { LaunchScreen() }
+                }
+            }
         }
     }
 
@@ -249,8 +265,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** The shortest time the logo stays on screen when the app opens. */
-private const val SPLASH_MIN_MS = 700L
+/** The shortest time the loading screen stays on screen when the app opens. */
+private const val LAUNCH_MIN_MS = 1_400L
 
 /** How long work the first screen doesn't need (guide, list refresh, update check) waits after the app opens. */
 private const val STARTUP_QUIET_MS = 1_500L
