@@ -19,6 +19,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.async
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -553,8 +558,12 @@ private fun HomeScreen(
     val firstRowFocus = remember { FocusRequester() }
     LaunchedEffect(isTv, section, visible.firstOrNull()?.url) {
         if (isTv && section != Section.Playlists && visible.isNotEmpty()) {
-            delay(250)
-            runCatching { firstRowFocus.requestFocus() }
+            // The grid may not be on screen yet (a big list, a slow box): keep trying for a few seconds instead of once,
+            // otherwise the remote starts on the tab bar and the arrows seem to do nothing
+            repeat(12) { attempt ->
+                delay(if (attempt == 0) 250L else 400L)
+                if (runCatching { firstRowFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+            }
         }
     }
 
@@ -737,13 +746,22 @@ private fun HomeScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (isTv) {
                 // Just the red dot, not the name: the TV's width is needed for all the tabs
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Sport first, as it is what the TV is mostly used for; ▼ from the tabs always goes down to the first channel
+                val tvTabs = remember { listOf(Section.Sport, Section.Israel, Section.All, Section.Favorites, Section.Recent, Section.Playlists) }
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp).onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown && section != Section.Playlists && visible.isNotEmpty()) {
+                            runCatching { firstRowFocus.requestFocus() }.isSuccess
+                        } else false
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Box(Modifier.size(10.dp).background(OnAir, CircleShape))
                     Spacer(Modifier.width(12.dp))
                     TvTabBar(
-                        labels = Section.entries.map { it.label },
-                        selected = section.ordinal,
-                        onSelect = { section = Section.entries[it] },
+                        labels = tvTabs.map { it.label },
+                        selected = tvTabs.indexOf(section),
+                        onSelect = { section = tvTabs[it] },
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = { dialog = HomeDialog.Search }) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
