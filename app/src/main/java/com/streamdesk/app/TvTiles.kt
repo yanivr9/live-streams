@@ -92,6 +92,7 @@ fun ChannelTile(
 ) {
     var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    var okDown by remember { mutableStateOf(false) }
     var heldOpen by remember { mutableStateOf(false) }   // the menu came from holding OK: ignore the click when OK is released
     LaunchedEffect(menu) {
         if (menu) {
@@ -117,14 +118,33 @@ fun ChannelTile(
                     .border(4.dp, Color.White, shape)
                 else Modifier
             )
-            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) { AppLog.i("keys", "  remote is on ${channel.displayName()}"); onFocused() }
+            }
+            // OK is handled here, from key down to key up, instead of leaving it to the click handler: holding OK opens the
+            // options, a tap plays the channel (a mouse or touch still uses the click below)
             .onPreviewKeyEvent { e ->
                 val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
-                if (e.type == KeyEventType.KeyDown && ok && e.nativeKeyEvent.repeatCount == 1) {
-                    heldOpen = true
-                    menu = true
-                    true
-                } else false
+                if (!ok) false
+                else when (e.type) {
+                    KeyEventType.KeyDown -> {
+                        when (e.nativeKeyEvent.repeatCount) {
+                            0 -> okDown = true
+                            1 -> { if (okDown) { okDown = false; menu = true } }
+                        }
+                        true
+                    }
+                    KeyEventType.KeyUp -> {
+                        if (okDown) {
+                            okDown = false
+                            AppLog.i("keys", "  OK on ${channel.displayName()}")
+                            onClick()
+                        }
+                        true
+                    }
+                    else -> false
+                }
             }
             .background(if (focused) FocusCard else MaterialTheme.colorScheme.surfaceContainer, shape)
             .clip(shape)

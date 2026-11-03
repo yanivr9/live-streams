@@ -187,6 +187,7 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLog.i("player", "Player screen opened")
         // The screen stays on for as long as the player is open, whatever the phone's screen timeout is
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         store = ChannelStore.get(this)

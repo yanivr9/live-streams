@@ -240,6 +240,7 @@ class MainActivity : ComponentActivity() {
         // Pass a window of the list so channel up/down works without hitting the Binder size limit
         val from = (index - 100).coerceAtLeast(0)
         val to = (index + 100).coerceAtMost(queue.size)
+        AppLog.i("app", "Opening the player: ${queue.getOrNull(index)?.displayName() ?: "?"} (${queue.size} channels)")
         startActivity(PlayerActivity.intent(this, queue.subList(from, to), index - from, format))
     }
 }
