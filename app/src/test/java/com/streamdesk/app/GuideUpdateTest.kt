@@ -88,6 +88,16 @@ class GuideUpdateTest {
     }
 
     @Test
+    fun everyBundledIsraeliLogoFileExists() {
+        fun ch(name: String) = Channel("http://h/live/u/p/${name.hashCode()}.ts", name, "Hebrew")
+        val names = Regex("""(?m)^\s+([^=\n]+?) = """).findAll(java.io.File("src/main/java/com/streamdesk/app/SportList.kt").readText().substringAfter("object IsraelList")).map { it.groupValues[1].trim() }.toList()
+        val picked = IsraelList.pick(names.map { ch(it) } + listOf(ch("Kan 11 4K"), ch("Makan 4K"), ch("YES TV Action FHD"), ch("HOT 3 HD")))
+        val files = picked.map { it.logo }.filter { it.startsWith("file:///android_asset/") }
+        assertEquals(true, files.size > 40)
+        files.forEach { assertEquals(it, true, java.io.File("src/main/assets/" + it.removePrefix("file:///android_asset/")).exists()) }
+    }
+
+    @Test
     fun israeliTabHasTheOtherChannelsOnceEach() {
         fun ch(name: String) = Channel("http://h/live/u/p/${name.hashCode()}.ts", name, "Hebrew")
         val provider = listOf(
