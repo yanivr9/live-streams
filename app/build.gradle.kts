@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 68
-        versionName = "3.47"
+        versionCode = 69
+        versionName = "3.48"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -45,6 +45,7 @@ android {
             it.maxHeapSize = "1g"   // the screen tests run a whole simulated Android
             // The simulated Android's system files, from Google's copy of Maven Central (the main site often says "too many requests")
             System.getProperty("tvshots")?.let { dir -> it.systemProperty("tvshots", dir) }   // pictures of the TV screens, on request
+            System.getProperty("qa")?.let { dir -> it.systemProperty("qa", dir) }   // QA walk-through pictures, on request
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
         }
     }

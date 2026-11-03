@@ -879,8 +879,8 @@ private fun HomeScreen(
                 // The tiles are sized so exactly [tileCount] fit on the screen: the rows share the height
                 BoxWithConstraints(Modifier.weight(1f)) {
                     val gap = 12.dp
-                    // The rows share the height exactly (the scaled tile still fits), so no row is cut off at the edges
-                    val rowHeight = ((maxHeight - 8.dp - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
+                    // The rows share the height exactly, leaving 8 dp at the bottom (less than the gap), so the next row never peeks in
+                    val rowHeight = ((maxHeight - 8.dp - 8.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
                 // Each tab (and folder) opens at its own top, not where the previous tab was scrolled to
                 key(section, group, sourceFilter) {
                 val gridState = rememberLazyGridState()
@@ -888,7 +888,7 @@ private fun HomeScreen(
                     state = gridState,
                     columns = GridCells.Fixed(tileCount.columns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                     verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
