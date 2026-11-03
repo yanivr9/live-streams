@@ -46,6 +46,7 @@ object NowOn {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val parallel = Semaphore(6)
     private val fetchedAt = ConcurrentHashMap<String, Long>()
+    private var failures = 0   // in a row: when the network is down, the guide waits longer between tries instead of asking every 3 minutes
     private val inFlight: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val _guides = MutableStateFlow<Map<String, List<Program>>>(emptyMap())
 
@@ -61,9 +62,16 @@ object NowOn {
         scope.launch {
             try {
                 parallel.withPermit {
-                    val programs = runCatching { Epg.load(login, url) }.getOrDefault(emptyList())
-                    fetchedAt[url] = System.currentTimeMillis()
-                    _guides.update { it + (url to programs) }
+                    val result = runCatching { Epg.load(login, url) }
+                    if (result.isSuccess) {
+                        failures = 0
+                        fetchedAt[url] = System.currentTimeMillis()
+                        _guides.update { it + (url to result.getOrThrow()) }
+                    } else {
+                        // Keep the guide we had; try again after 3, 6, 12 … up to 30 minutes
+                        failures = (failures + 1).coerceAtMost(4)
+                        fetchedAt[url] = System.currentTimeMillis() + (FRESH_MS * (1 shl failures) - FRESH_MS).coerceAtMost(27 * 60_000L)
+                    }
                 }
             } finally {
                 inFlight.remove(url)

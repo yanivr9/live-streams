@@ -809,6 +809,8 @@ class PlayerActivity : ComponentActivity() {
         val code = e.errorCode
         return when {
             httpCode != null -> httpProblem(httpCode).replaceFirstChar { it.uppercase() } + "."
+            generateSequence<Throwable>(e) { it.cause }.any { it is java.net.UnknownHostException } ->
+                "Can't find the server. If other apps work, a VPN or the DNS may be blocking it: turn the VPN off, or set Private DNS to dns.google (Settings → Network → Private DNS)."
             code in NETWORK_ERRORS -> "Can't reach the server. Check the link and your internet connection."
             code == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "That file doesn't exist."
             code in PARSING_ERRORS ->

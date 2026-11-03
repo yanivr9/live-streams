@@ -96,7 +96,7 @@ private fun download(link: String, userAgent: String, sniff: Boolean): String? {
             }
             throw IOException(
                 when (e) {
-                    is java.net.UnknownHostException -> "can't find the server. Check the address, or your internet connection"
+                    is java.net.UnknownHostException -> "can't find the server. Check the address and your internet connection. If other apps work, a VPN or the DNS may be blocking it: turn the VPN off, or set Private DNS to dns.google (Settings → Network → Private DNS)"
                     is java.net.SocketTimeoutException -> "the server didn't answer in time. It may be down, or blocked on your network"
                     is java.net.ConnectException -> "the server refused the connection. It may be down, or blocked on your network"
                     else -> "can't reach the server. Check the link and your internet connection"
