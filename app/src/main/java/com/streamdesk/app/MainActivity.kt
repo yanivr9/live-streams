@@ -146,6 +146,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -201,6 +204,7 @@ class MainActivity : ComponentActivity() {
         if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0 && isTelevision()) {
             AppLog.i("keys", "Remote key: ${android.view.KeyEvent.keyCodeToString(event.keyCode)}")
         }
+        if (isTelevision() && HomeKeys.handler?.invoke(event) == true) return true
         return super.dispatchKeyEvent(event)
     }
 
@@ -557,16 +561,14 @@ private fun HomeScreen(
     // On a TV the remote needs something selected from the start: the first channel
     val isTv = LocalIsTv.current
     val firstRowFocus = remember { FocusRequester() }
-    LaunchedEffect(isTv, section, visible.firstOrNull()?.url) {
-        if (isTv && section != Section.Playlists && visible.isNotEmpty()) {
-            // The grid may not be on screen yet (a big list, a slow box): keep trying for a few seconds instead of once,
-            // otherwise the remote starts on the tab bar and the arrows seem to do nothing
-            repeat(12) { attempt ->
-                delay(if (attempt == 0) 250L else 400L)
-                if (runCatching { firstRowFocus.requestFocus() }.isSuccess) return@LaunchedEffect
-            }
-        }
-    }
+    // TV remote: the channel grid has its own selection (see HomeKeys); the tabs and buttons use Android's focus
+    var tvInGrid by remember { mutableStateOf(true) }
+    var tvSelected by remember { mutableIntStateOf(0) }
+    var tvMenuSignal by remember { mutableIntStateOf(0) }
+    var tvOkDown by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val tabRequesters = remember { List(3) { FocusRequester() } }
+    LaunchedEffect(section, group, sourceFilter, query) { tvSelected = 0; tvInGrid = true }
 
     val isTvMenu = LocalIsTv.current
     // The ⋮ entries, shown as a menu on a TV and as a panel from the bottom on a phone
@@ -680,6 +682,68 @@ private fun HomeScreen(
                     }
     }
 
+    // The remote's keys while the channel grid is the active part of the screen (see HomeKeys)
+    val tvVisible by rememberUpdatedState(visible)
+    val tvColumns by rememberUpdatedState(tileCount.columns)
+    val tvBlocked by rememberUpdatedState(dialog != null || moreMenu || section == Section.Playlists)
+    val tvSection by rememberUpdatedState(section)
+    val tvOpen by rememberUpdatedState<(Int) -> Unit> { i ->
+        val list = tvVisible
+        val ch = list.getOrNull(i)
+        if (ch != null) {
+            if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
+            else onPlay(list.filter { it.kind != Kind.SERIES }, list.subList(0, i).count { it.kind != Kind.SERIES }, format)
+        }
+    }
+    DisposableEffect(isTv) {
+        val handler: (android.view.KeyEvent) -> Boolean = handler@{ e ->
+            val code = e.keyCode
+            val ok = code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_ENTER || code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
+            val arrow = code == android.view.KeyEvent.KEYCODE_DPAD_UP || code == android.view.KeyEvent.KEYCODE_DPAD_DOWN ||
+                code == android.view.KeyEvent.KEYCODE_DPAD_LEFT || code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+            val list = tvVisible
+            if (tvBlocked || list.isEmpty() || !(ok || arrow)) return@handler false
+            val down = e.action == android.view.KeyEvent.ACTION_DOWN
+            if (!tvInGrid) {
+                // On the tabs and buttons Android's focus does the work, except ▼, which goes down into the channels
+                if (code == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (down) { tvInGrid = true; focusManager.clearFocus() }
+                    return@handler true
+                }
+                return@handler false
+            }
+            val cols = tvColumns
+            val cur = tvSelected.coerceIn(0, list.size - 1)
+            if (down) {
+                when (code) {
+                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> tvSelected = GridMoves.down(cur, cols, list.size)
+                    android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                        val up = GridMoves.up(cur, cols)
+                        if (up != null) tvSelected = up
+                        else {
+                            tvInGrid = false
+                            val tab = when (tvSection) { Section.Favorites -> 1; Section.All -> 2; else -> 0 }
+                            runCatching { tabRequesters[tab].requestFocus() }
+                        }
+                    }
+                    android.view.KeyEvent.KEYCODE_DPAD_LEFT -> tvSelected = GridMoves.left(cur, cols)
+                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> tvSelected = GridMoves.right(cur, cols, list.size)
+                    else -> when (e.repeatCount) {
+                        0 -> tvOkDown = true
+                        1 -> if (tvOkDown) { tvOkDown = false; tvMenuSignal++ }   // holding OK: the channel's options
+                    }
+                }
+            } else if (ok && tvOkDown) {
+                tvOkDown = false
+                AppLog.i("keys", "  OK on ${list[cur].displayName()}")
+                tvOpen(cur)
+            }
+            true
+        }
+        if (isTv) HomeKeys.handler = handler
+        onDispose { if (HomeKeys.handler === handler) HomeKeys.handler = null }
+    }
+
     Scaffold(
         topBar = {
             if (!isTv) TopAppBar(
@@ -747,14 +811,10 @@ private fun HomeScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (isTv) {
                 // Just the red dot, not the name: the TV's width is needed for all the tabs
-                // Only Sport, Favorites and All on a TV (Sport first, as it is what the TV is mostly used for); ▼ from the tabs always goes down to the first channel
+                // Only Sport, Favorites and All on a TV (Sport first, as it is what the TV is mostly used for)
                 val tvTabs = remember { listOf(Section.Sport, Section.Favorites, Section.All) }
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp).onPreviewKeyEvent { e ->
-                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown && section != Section.Playlists && visible.isNotEmpty()) {
-                            runCatching { firstRowFocus.requestFocus() }.isSuccess
-                        } else false
-                    },
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.size(10.dp).background(OnAir, CircleShape))
@@ -762,8 +822,10 @@ private fun HomeScreen(
                     TvTabBar(
                         labels = tvTabs.map { it.label },
                         selected = tvTabs.indexOf(section),
-                        onSelect = { section = tvTabs[it] },
+                        // OK on a tab opens it and goes down into its channels
+                        onSelect = { section = tvTabs[it]; tvInGrid = true; focusManager.clearFocus() },
                         modifier = Modifier.weight(1f),
+                        requesters = tabRequesters,
                     )
                     IconButton(onClick = { dialog = HomeDialog.Search }, modifier = Modifier.tvFocusRing()) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
                     topActions()
@@ -907,6 +969,18 @@ private fun HomeScreen(
                 // Each tab (and folder) opens at its own top, not where the previous tab was scrolled to
                 key(section, group, sourceFilter) {
                 val gridState = rememberLazyGridState()
+                // The grid moves a whole row at a time, keeping the selected row in the middle: the tiles never end up
+                // half off the screen, and the picture doesn't jump by uneven amounts
+                LaunchedEffect(tvSelected, tvInGrid, tileCount) {
+                    if (tvInGrid && visible.isNotEmpty()) {
+                        val columns = tileCount.columns
+                        val row = tvSelected.coerceIn(0, visible.size - 1) / columns
+                        val firstRow = (row - (tileCount.rows - 1) / 2).coerceAtLeast(0)
+                        if (gridState.firstVisibleItemIndex / columns != firstRow || gridState.firstVisibleItemScrollOffset != 0) {
+                            gridState.animateScrollToItem(firstRow * columns)
+                        }
+                    }
+                }
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Fixed(tileCount.columns),
@@ -919,16 +993,9 @@ private fun HomeScreen(
                         // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
                         LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
                         ChannelTile(
-                            // The grid moves a whole row at a time, keeping the row the remote is on in the middle: the tiles
-                            // never end up half off the screen, and the picture doesn't jump by uneven amounts
-                            onFocused = {
-                                val columns = tileCount.columns
-                                val firstRow = ((i / columns) - (tileCount.rows - 1) / 2).coerceAtLeast(0)
-                                if (gridState.firstVisibleItemIndex / columns != firstRow || gridState.firstVisibleItemScrollOffset != 0) {
-                                    scope.launch { gridState.animateScrollToItem(firstRow * columns) }
-                                }
-                            },
-                            modifier = (if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier).height(rowHeight),
+                            modifier = Modifier.height(rowHeight),
+                            selected = tvInGrid && tvSelected.coerceIn(0, visible.size - 1) == i,
+                            menuSignal = tvMenuSignal,
                             channel = ch,
                             number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
                             saved = numbers[ch.url] != null,

@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -89,9 +91,21 @@ fun ChannelTile(
     onGuide: (() -> Unit)? = null,
     fillHeight: Boolean = false,
     onFocused: () -> Unit = {},
+    /** The home screen's own selection (the remote's cursor): drawn like focus. */
+    selected: Boolean = false,
+    /** Changes when OK is held on the selected channel: opens its options. */
+    menuSignal: Int = 0,
 ) {
-    var focused by remember { mutableStateOf(false) }
+    var composeFocused by remember { mutableStateOf(false) }
+    val focused = composeFocused || selected
     var menu by remember { mutableStateOf(false) }
+    var seenMenuSignal by remember { mutableStateOf(menuSignal) }
+    LaunchedEffect(menuSignal) {
+        if (menuSignal != seenMenuSignal) {
+            seenMenuSignal = menuSignal
+            if (selected) menu = true
+        }
+    }
     var okDown by remember { mutableStateOf(false) }
     var heldOpen by remember { mutableStateOf(false) }   // the menu came from holding OK: ignore the click when OK is released
     LaunchedEffect(menu) {
@@ -117,7 +131,7 @@ fun ChannelTile(
             .shadow(if (focused) 24.dp else 0.dp, shape, ambientColor = Color.White, spotColor = Color.White)
             .border(4.dp, if (focused) Color.White else Color.Transparent, shape)
             .onFocusChanged {
-                focused = it.isFocused
+                composeFocused = it.isFocused
                 if (it.isFocused) { AppLog.i("keys", "  remote is on ${channel.displayName()}"); onFocused() }
             }
             // OK is handled here, from key down to key up, instead of leaving it to the click handler: holding OK opens the
@@ -232,12 +246,13 @@ fun ChannelTile(
  * Scrolls by itself so the chosen tab is always in view.
  */
 @Composable
-fun TvTabBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun TvTabBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, requesters: List<FocusRequester> = emptyList()) {
     val list = rememberLazyListState()
     LaunchedEffect(selected) { list.animateScrollToItem((selected - 1).coerceAtLeast(0)) }
     LazyRow(modifier, state = list, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
         itemsIndexed(labels) { i, label ->
             var focused by remember { mutableStateOf(false) }
+            val fallbackRequester = remember { FocusRequester() }
             val pill = RoundedCornerShape(50)
             val chosen = i == selected
             Box(
@@ -247,6 +262,7 @@ fun TvTabBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modif
                     .border(2.dp, if (focused) Color.White else Color.Transparent, pill)
                     .background(if (chosen) Amber else if (focused) FocusCard else Color.Transparent, pill)
                     .clip(pill)
+                    .focusRequester(requesters.getOrNull(i) ?: fallbackRequester)
                     .onFocusChanged { focused = it.isFocused }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(i) }
                     .padding(horizontal = 14.dp, vertical = 6.dp),
