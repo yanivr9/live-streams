@@ -19,7 +19,11 @@ import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.ConcurrentHashMap
 
 /** What a channel is showing: the program on now (with how far it has got) and the one after it. */
-data class NowNext(val now: String?, val progress: Float?, val next: String?) {
+data class NowNext(
+    val now: String?, val progress: Float?, val next: String?,
+    /** The same, in pieces, for the TV banner: the programme on now, when it ends, and the one after with its start time. */
+    val title: String? = null, val until: String? = null, val nextTitle: String? = null, val nextTime: String? = null,
+) {
     companion object {
         /** From a channel's short guide at [nowSeconds]; null when the guide has nothing to say. */
         fun of(programs: List<Program>?, nowSeconds: Long, clock: (Long) -> String = Epg::clock): NowNext? {
@@ -31,6 +35,7 @@ data class NowNext(val now: String?, val progress: Float?, val next: String?) {
                 now = on?.let { "${it.title} · until ${clock(it.stop)}" },
                 progress = on?.let { ((nowSeconds - it.start).toFloat() / (it.stop - it.start)).coerceIn(0f, 1f) },
                 next = next?.let { "${clock(it.start)} ${it.title}" },
+                title = on?.title, until = on?.let { clock(it.stop) }, nextTitle = next?.title, nextTime = next?.let { clock(it.start) },
             )
         }
     }

@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.Cast
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.remember
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -178,8 +180,9 @@ class PlayerActivity : ComponentActivity() {
     private var castCode = ""
     private var showTvPicker by mutableStateOf(false)
     private var banner by mutableStateOf<String?>(null)   // "12 · channel name", shown briefly after switching channel
+    private var guideBanner by mutableStateOf<GuideBannerInfo?>(null)   // TV: the bar along the bottom with the channel and its guide
     private val bannerHandler = Handler(Looper.getMainLooper())
-    private val hideBanner = Runnable { banner = null }
+    private val hideBanner = Runnable { banner = null; guideBanner = null }
     private val typedNumber = NumberEntry()
     private val goToTypedNumber = Runnable { commitTypedNumber() }
     private var hasQualities by mutableStateOf(false)
@@ -565,6 +568,7 @@ class PlayerActivity : ComponentActivity() {
     /** A number key on the remote: wait a moment for more digits (or OK), then go to that channel. */
     private fun typeNumber(digit: Int) {
         typedNumber.press(digit)
+        guideBanner = null
         banner = "Channel ${typedNumber.text}_"
         bannerHandler.removeCallbacks(hideBanner)
         bannerHandler.removeCallbacks(goToTypedNumber)
@@ -589,11 +593,16 @@ class PlayerActivity : ComponentActivity() {
         // The guide in the banner: what's on now and next (fetched now if this channel's isn't known yet)
         store.sources.value.firstOrNull { it.url == ch.source }?.xtream?.let { NowOn.want(ch.url, it) }
         val air = NowNext.of(NowOn.guides.value[ch.url], System.currentTimeMillis() / 1000)
-        banner = listOfNotNull(
-            "${index + 1} / ${queue.size}  ·  ${ch.displayName()}",
-            air?.now,
-            air?.next?.let { "Next: $it" },
-        ).joinToString("\n")
+        if (isTv) {
+            banner = null
+            guideBanner = GuideBannerInfo(ch, index + 1, queue.size, air)
+        } else {
+            banner = listOfNotNull(
+                "${index + 1} / ${queue.size}  ·  ${ch.displayName()}",
+                air?.now,
+                air?.next?.let { "Next: $it" },
+            ).joinToString("\n")
+        }
         bannerHandler.removeCallbacks(hideBanner)
         bannerHandler.postDelayed(hideBanner, if (isTv) 4000 else 2500)
     }
@@ -972,6 +981,19 @@ class PlayerActivity : ComponentActivity() {
                         .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
+            }
+
+            // TV: the channel and its guide as a bar along the bottom of the picture
+            val shownGuide = guideBanner
+            var lastGuide by remember { mutableStateOf<GuideBannerInfo?>(null) }
+            if (shownGuide != null) lastGuide = shownGuide
+            AnimatedVisibility(
+                visible = shownGuide != null,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                lastGuide?.let { GuideBar(it) }
             }
 
             status?.let { s ->
