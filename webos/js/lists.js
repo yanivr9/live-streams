@@ -163,9 +163,27 @@
     return '';
   }
 
+  /** What is on now (title, how far through, until when) and what comes next; null when the guide has nothing on right now. */
+  function nowNext(listings, nowSeconds, atobFn, clock) {
+    for (var i = 0; i < listings.length; i++) {
+      var o = listings[i];
+      var start = parseInt(o.start_timestamp, 10), stop = parseInt(o.stop_timestamp, 10);
+      if (nowSeconds >= start && nowSeconds < stop) {
+        var next = listings[i + 1];
+        return {
+          title: decodeTitle(o.title, atobFn), until: clock(stop),
+          progress: stop > start ? (nowSeconds - start) / (stop - start) : 0,
+          nextTitle: next ? decodeTitle(next.title, atobFn) : '',
+          nextTime: next ? clock(parseInt(next.start_timestamp, 10)) : ''
+        };
+      }
+    }
+    return null;
+  }
+
   var api = {
     SPORT_TEXT: SPORT_TEXT, ISRAEL_TEXT: ISRAEL_TEXT, CAP: CAP,
-    displayName: displayName, pick: pick, decodeTitle: decodeTitle, nowLabel: nowLabel, qualityOf: qualityOf
+    displayName: displayName, pick: pick, decodeTitle: decodeTitle, nowLabel: nowLabel, nowNext: nowNext, qualityOf: qualityOf
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Lists = api;

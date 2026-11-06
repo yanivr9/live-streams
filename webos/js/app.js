@@ -37,6 +37,17 @@
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function clock(seconds) { var d = new Date(seconds * 1000); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
   function enc(s) { return encodeURIComponent(s); }
+  var BADGES = ['#3E8E63', '#3F7FBF', '#B0603F', '#8A5AB0', '#2F8F9D', '#A8863A', '#BF4F6E', '#5B6FB8'];
+  /** A colored name tile for a channel without a logo (the colour is always the same for the same name). */
+  function badge(name) {
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    var el = document.createElement('div');
+    el.className = 'badge';
+    el.style.background = BADGES[h % BADGES.length];
+    el.textContent = name;
+    return el;
+  }
 
   var state = {
     login: store('login'),                  // { server, user, pass, folders }
@@ -47,6 +58,7 @@
     tabFocus: 0,
     index: 0,                               // focused tile
     guide: {},                              // channel id → "what's on now"
+    air: {},                                // channel id → { title, until, progress, nextTitle, nextTime }
     screen: 'home'
   };
 
@@ -141,16 +153,13 @@
       tile.className = 'tile' + (state.zone === 'grid' && i === state.index ? ' focused' : '');
       var logo = document.createElement('div');
       logo.className = 'logo';
-      var num = document.createElement('span');
-      num.className = 'num';
-      num.textContent = pad(i + 1);
       if (c.logo) {
         var img = document.createElement('img');
         img.src = c.logo;
-        img.onerror = function () { logo.innerHTML = ''; logo.appendChild(num); };
+        img.onerror = function () { logo.innerHTML = ''; logo.appendChild(badge(c.name)); };
         logo.appendChild(img);
       } else {
-        logo.appendChild(num);
+        logo.appendChild(badge(c.name));
       }
       var name = document.createElement('div');
       name.className = 'name';
@@ -211,7 +220,10 @@
     var now = Date.now() / 1000;
     list.forEach(function (c) {
       getJson(api(state.login, 'get_short_epg', '&stream_id=' + c.id + '&limit=3')).then(function (data) {
-        var label = Lists.nowLabel((data && data.epg_listings) || [], now, window.atob, clock);
+        var listings = (data && data.epg_listings) || [];
+        var air = Lists.nowNext(listings, now, window.atob, clock);
+        if (air) state.air[c.id] = air;
+        var label = Lists.nowLabel(listings, now, window.atob, clock);
         if (label && state.guide[c.id] !== label) {
           state.guide[c.id] = label;
           var i = visible.indexOf(c);
@@ -282,7 +294,7 @@
     } else if (id === 'b-cancel') {
       closeSettings();
     } else if (id === 'b-signout') {
-      state.login = null; state.channels = []; state.guide = {};
+      state.login = null; state.channels = []; state.guide = {}; state.air = {};
       store('login', null); store('channels', []);
       closeSettings();
     }
@@ -296,7 +308,7 @@
     if (!login.server || !login.user || !login.pass) { $('f-error').textContent = 'Fill in the server address, username and password.'; return; }
     $('f-error').textContent = 'Signing in…';
     loadChannels(login).then(function (list) {
-      state.login = login; state.channels = list; state.guide = {};
+      state.login = login; state.channels = list; state.guide = {}; state.air = {};
       store('login', login); store('channels', list);
       state.tab = 0; store('tab', 0);
       closeSettings();
@@ -315,7 +327,7 @@
 
   // ---------- the player ----------
 
-  var player = { list: [], index: 0, ext: 'm3u8', reconnects: 0, timer: null, stallTimer: null, bannerTimer: null, typed: '', typedTimer: null, open: false };
+  var player = { list: [], index: 0, ext: 'm3u8', reconnects: 0, timer: null, stallTimer: null, bannerTimer: null, guideTimer: null, typed: '', typedTimer: null, open: false };
   var video = $('video');
 
   function play(list, i) {
@@ -407,6 +419,9 @@
     clearTimeout(player.timer);
     stopVideo();
     setStatus(null);
+    clearTimeout(player.guideTimer);
+    $('guide').className = 'guide hidden';
+    $('banner').className = 'banner hidden';
     show('home');
     var i = visible.indexOf(player.list[player.index]);
     if (i >= 0) { state.index = i; state.zone = 'grid'; }
@@ -420,23 +435,80 @@
     el.className = 'status' + (isError ? ' error' : '');
   }
 
+  /** The small pill at the top: a typed channel number or a short message. */
   function showBanner(text) {
-    var c = player.list[player.index];
+    if (!text) { showGuide(); return; }
     var el = $('banner');
-    el.innerHTML = '';
-    var title = document.createElement('div');
-    title.textContent = text || ((player.index + 1) + ' / ' + player.list.length + '  ·  ' + c.name);
-    el.appendChild(title);
-    var sub = state.guide[c.id] || c.quality;
-    if (!text && sub) {
-      var s = document.createElement('div');
-      s.className = 'sub';
-      s.textContent = sub;
-      el.appendChild(s);
-    }
+    el.textContent = text;
     el.className = 'banner';
     clearTimeout(player.bannerTimer);
     player.bannerTimer = setTimeout(function () { el.className = 'banner hidden'; }, 4000);
+  }
+
+  /** The glass guide bar along the bottom: logo, number, name, LIVE, what's on with its progress, and what's next. */
+  function renderGuide() {
+    var c = player.list[player.index];
+    var el = $('guide');
+    if (!c) return;
+    var air = state.air[c.id];
+    el.innerHTML = '';
+    function div(cls, text) { var d = document.createElement('div'); d.className = cls; if (text !== undefined) d.textContent = text; return d; }
+
+    var logo = div('gl');
+    if (c.logo) {
+      var img = document.createElement('img');
+      img.src = c.logo;
+      img.onerror = function () { logo.innerHTML = ''; logo.appendChild(badge(c.name)); };
+      logo.appendChild(img);
+    } else {
+      logo.appendChild(badge(c.name));
+    }
+    el.appendChild(logo);
+
+    var main = div('gmain');
+    var head = div('ghead');
+    head.appendChild(div('gnum', String(player.index + 1)));
+    head.appendChild(div('gname', c.name));
+    head.appendChild(div('glive', 'LIVE'));
+    main.appendChild(head);
+    main.appendChild(div('gnow', air ? air.title : 'No guide for this channel'));
+    if (air) {
+      var bar = div('gbar');
+      var fill = document.createElement('i');
+      fill.style.width = Math.round(Math.max(0.03, Math.min(1, air.progress)) * 100) + '%';
+      bar.appendChild(fill);
+      main.appendChild(bar);
+    }
+    main.appendChild(div('gmeta', (air ? 'until ' + air.until + '  ·  ' : '') + (player.index + 1) + '/' + player.list.length + (c.quality ? '  ·  ' + c.quality : '')));
+    el.appendChild(main);
+
+    if (air && air.nextTitle && window.innerWidth >= 900) {
+      var next = div('gnext');
+      next.appendChild(div('k', 'NEXT'));
+      next.appendChild(div('t', air.nextTitle));
+      next.appendChild(div('w', air.nextTime));
+      el.appendChild(next);
+    }
+  }
+
+  function showGuide() {
+    var c = player.list[player.index];
+    if (!c) return;
+    renderGuide();
+    var el = $('guide');
+    el.className = 'guide';
+    clearTimeout(player.guideTimer);
+    player.guideTimer = setTimeout(function () { el.className = 'guide hidden'; }, 4000);
+    // A channel from the All tab has no guide yet: ask for just this one, and fill the bar in when it arrives
+    if (state.login && !state.air[c.id]) {
+      var shown = c;
+      getJson(api(state.login, 'get_short_epg', '&stream_id=' + c.id + '&limit=3')).then(function (data) {
+        var air = Lists.nowNext((data && data.epg_listings) || [], Date.now() / 1000, window.atob, clock);
+        if (!air) return;
+        state.air[shown.id] = air;
+        if (player.open && player.list[player.index] === shown) renderGuide();
+      }).catch(function () { /* no guide for this channel */ });
+    }
   }
 
   /** Number keys: 3 goes to channel 3; 1 then 2 to channel 12 (after a moment, or at once with OK). */
@@ -538,23 +610,36 @@
   tick();
   setInterval(tick, 15000);
 
+  // The loading screen stays for a moment (and until the saved list is on screen), then fades away
+  var launchShownAt = Date.now();
+  function hideLaunch() {
+    var el = $('launch');
+    if (!el) return;
+    var wait = Math.max(0, 1400 - (Date.now() - launchShownAt));
+    setTimeout(function () { el.className = 'done'; setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 500); }, wait);
+  }
+
   if (state.tab >= TABS.length - 1) state.tab = 0;
   render();
   if (!state.login) {
     state.zone = 'tabs'; state.tabFocus = TABS.length - 1; refreshFocus();
+    hideLaunch();
   } else {
     // Show the saved list at once, then refresh it from the provider
     refreshGuide();
     state.loading = !state.channels.length;
     if (state.loading) render();
+    else hideLaunch();
     loadChannels(state.login).then(function (list) {
       state.loading = false;
+      hideLaunch();
       state.channels = list;
       store('channels', list);
       if (state.screen === 'home') render();
       refreshGuide();
     }).catch(function (e) {
       state.loading = false;
+      hideLaunch();
       if (!state.channels.length) showMessage('Couldn\'t load your channels: ' + (e.message || 'no answer from the server') + '. Check Settings and the internet connection.');
     });
   }

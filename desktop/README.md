@@ -1,6 +1,6 @@
 # Stream Desk for Windows
 
-The TV app's essentials on a PC: sign in, Sport / Israeli TV / All tabs with logos and what's on now, and a player.
+The TV app's essentials on a PC: sign in, Sport / Israeli TV / All tabs with logos (a coloured name tile when a channel has none) and what's on now, a loading screen, a clear white highlight, and a player with a glass guide bar along the bottom (logo, number, LIVE, what's on with its progress, what's next).
 It is the LG version's screens (`../webos`) in an Electron window, with hls.js and mpegts.js playing the streams
 (`player.js`), since a PC's browser engine can't play them by itself.
 
