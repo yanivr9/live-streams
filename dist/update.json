@@ -1,6 +1,6 @@
 {
-  "versionCode": 81,
-  "versionName": "3.60",
+  "versionCode": 82,
+  "versionName": "3.61",
   "apk": "StreamDesk.apk",
-  "notes": ""
+  "notes": "Cleaner player: the stream-info, picture-in-picture and previous/next buttons are gone from the top bar (new signing key: uninstall the old app once, then install this)"
 }

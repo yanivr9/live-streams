@@ -66,11 +66,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.HighQuality
-import androidx.compose.material.icons.filled.PictureInPictureAlt
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -1190,10 +1186,6 @@ class PlayerActivity : ComponentActivity() {
                     }
                 }
             }
-            if (queue.size > 1) {
-                IconButton(onClick = { zap(-1) }) { Icon(Icons.Default.SkipPrevious, "Previous channel", tint = Color.White) }
-                IconButton(onClick = { zap(1) }) { Icon(Icons.Default.SkipNext, "Next channel", tint = Color.White) }
-            }
             IconButton(onClick = { current?.let(store::toggleFavorite) }) {
                 if (favorite) Icon(Icons.Default.Star, "Remove from favorites", tint = Amber)
                 else Icon(Icons.Outlined.StarBorder, "Add to favorites", tint = Color.White)
@@ -1201,11 +1193,7 @@ class PlayerActivity : ComponentActivity() {
             if (hasQualities) {
                 IconButton(onClick = ::showQualityPicker) { Icon(Icons.Default.HighQuality, "Video quality", tint = Color.White) }
             }
-            IconButton(onClick = { showStats = !showStats }) {
-                Icon(Icons.Outlined.QueryStats, "Stream info", tint = if (showStats) Amber else Color.White)
-            }
             IconButton(onClick = { showTvPicker = true }) { Icon(Icons.Default.Cast, "Play on TV", tint = Color.White) }
-            IconButton(onClick = ::enterPip) { Icon(Icons.Default.PictureInPictureAlt, "Picture-in-picture", tint = Color.White) }
         }
     }
 

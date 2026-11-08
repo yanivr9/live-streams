@@ -60,6 +60,8 @@ class QrLinkTest {
         override fun play(queue: List<Channel>, index: Int) {}
         override fun command(action: String) {}
         override fun login(request: LoginRequest) {}
+        override fun takeOver(): Pair<List<Channel>, Int>? = null
+        override fun logs(): String = ""
     })
 
     @After

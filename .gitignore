@@ -6,7 +6,7 @@
 StreamDesk-debug.apk
 app/src/test/java/com/streamdesk/app/RealDataTest.kt
 build/
-debug.keystore
+# debug.keystore is committed on purpose: every build must be signed with the same key
 local.properties
 
 # The published update (see scripts/release.sh)
