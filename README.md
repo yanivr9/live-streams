@@ -16,7 +16,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
 - **M3U / M3U8 files**: one-time import from a file or pasted text, and export or share.
   Reads `tvg-logo`, `group-title`, `#EXTGRP`, `http-user-agent` / `http-referrer` and `#EXTVLCOPT` header options.
 - **Player**: full screen, picture-in-picture, video quality picker, subtitles and audio tracks,
-  previous/next channel, and a stream info panel (resolution, codec, bitrate, buffer, dropped frames, delay behind live).
+  previous/next channel, and a stream info panel on the TV (Menu key: resolution, codec, bitrate, buffer, dropped frames, delay behind live).
 - **TV mode** (Android TV / Google TV boxes such as the Xiaomi Mi Box): appears on the TV home screen, larger UI, a
   highlight that follows the remote, ▲/▼ to change channel, OK for the channel list, Menu for quality or stream info.
   Switches on automatically on a TV; phones are unchanged.
