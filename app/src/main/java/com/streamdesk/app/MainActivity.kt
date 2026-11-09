@@ -609,9 +609,6 @@ private fun HomeScreen(
                                     onClick = { moreMenu = false; linkBarOpen = !linkBarOpen },
                                 )
                             }
-                            AppMenuItem(text = { Text("Clear recent") }, onClick = {
-                                moreMenu = false; store.clearRecent()
-                            })
                             if (LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Link a phone") }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.LinkPhone
@@ -628,9 +625,6 @@ private fun HomeScreen(
                                     moreMenu = false; dialog = HomeDialog.PickTv(TvJob.Logs)
                                 })
                             }
-                            AppMenuItem(text = { Text("Edit Sport list") }, onClick = {
-                                moreMenu = false; dialog = HomeDialog.EditSport
-                            })
                             if (LocalIsTv.current) {
                                 AppMenuItem(text = { Text("Open on last channel: " + if (openLast) "On" else "Off") }, onClick = {
                                     moreMenu = false; openLast = !openLast; Resume.setEnabled(context, openLast)
@@ -664,10 +658,6 @@ private fun HomeScreen(
                                         notify("Couldn't check for updates.")
                                     }
                                 }
-                            })
-                            HorizontalDivider()
-                            AppMenuItem(text = { Text("Logs") }, onClick = {
-                                moreMenu = false; dialog = HomeDialog.Logs
                             })
     }
 
@@ -1588,7 +1578,7 @@ private fun EmptyState(section: Section, filtered: Boolean) {
         section == Section.Favorites -> "No favorites yet. Tap the star next to a channel to pin it here."
         section == Section.Recent -> "Channels you play will show up here."
         section == Section.Israel -> "No Israeli channels found. They show up here once your account has Channel 11, 12, 13, 14 or 15."
-        section == Section.Sport -> "No sport channels found. Tap ⋮ → Edit Sport list to choose which channels appear here."
+        section == Section.Sport -> "No sport channels found. They show up here once your account has Sport 1–6, Sport 5 or ONE."
         section == Section.Playlists -> ""
         else -> "No channels yet. Paste a stream link above, or import an M3U playlist with the + button."
     }
