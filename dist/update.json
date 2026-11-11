@@ -1,6 +1,6 @@
 {
-  "versionCode": 83,
-  "versionName": "3.62",
+  "versionCode": 84,
+  "versionName": "3.63",
   "apk": "StreamDesk.apk",
-  "notes": "Cleaner menu: Clear recent, Edit Sport list and Logs removed"
+  "notes": "Phone: switch the channels between list and grid (3 across) with the new button at the top"
 }

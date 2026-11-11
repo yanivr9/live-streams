@@ -105,6 +105,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
@@ -484,6 +486,7 @@ private fun HomeScreen(
     }
     var openLast by remember { mutableStateOf(Resume.enabled(context)) }
     var tileCount by remember { mutableStateOf(TileCount.load(context)) }
+    var phoneGrid by remember { mutableStateOf(PhoneView.isGrid(context)) }
     var backgroundSound by remember { mutableStateOf(BackgroundAudio.enabled(context)) }
 
     fun playLink(link: String) = onPlay(listOf(store.find(link) ?: Channel(link, nameFromUrl(link))), 0, format)
@@ -665,6 +668,13 @@ private fun HomeScreen(
                     if (LocalIsTv.current) {
                         IconButton(onClick = { dialog = HomeDialog.LinkPhone }, modifier = Modifier.tvFocusRing()) {
                             Icon(Icons.Default.Cast, contentDescription = "Link a phone")
+                        }
+                    }
+                    if (!LocalIsTv.current) {
+                        // List or grid: the icon shows the view a tap switches to
+                        IconButton(onClick = { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
+                            if (phoneGrid) Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Show as list", tint = Amber)
+                            else Icon(Icons.Default.GridView, contentDescription = "Show as grid", tint = Amber)
                         }
                     }
                     Box {
@@ -1021,6 +1031,49 @@ private fun HomeScreen(
                         )
                     }
                 }
+                }
+                }
+            } else if (phoneGrid) {
+                // The phone's grid: 3 cards across when held upright, more on a tablet or sideways
+                key(section, group, sourceFilter) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 108.dp),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                        LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
+                        val saved = numbers[ch.url] != null
+                        val guideLogin = loginFor(ch)
+                        PhoneTile(
+                            channel = ch,
+                            tag = if (section == Section.Sport || section == Section.Israel) ch.group else null,
+                            onAir = NowNext.of(guides[ch.url], nowSeconds),
+                            onClick = {
+                                if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
+                                else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
+                            },
+                            onToggleFavorite = { store.toggleFavorite(ch) },
+                            menuItems = { close ->
+                                if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { close(); dialog = HomeDialog.Rename(ch) })
+                                else AppMenuItem(text = { Text("Save to channels") }, onClick = { close(); store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") })
+                                if (guideLogin != null) AppMenuItem(text = { Text("TV guide") }, onClick = { close(); dialog = HomeDialog.Guide(ch, guideLogin) })
+                                AppMenuItem(text = { Text("Play on TV") }, onClick = {
+                                    close()
+                                    val from = (i - 100).coerceAtLeast(0)
+                                    val to = (i + 100).coerceAtMost(visible.size)
+                                    dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
+                                })
+                                AppMenuItem(text = { Text("Copy link") }, onClick = { close(); clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") })
+                                AppMenuItem(text = { Text(if (section == Section.Recent) "Remove from recent" else "Delete channel") }, onClick = {
+                                    close()
+                                    if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url)
+                                })
+                            },
+                        )
+                    }
                 }
                 }
             } else {
