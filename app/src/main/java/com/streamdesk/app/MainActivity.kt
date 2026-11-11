@@ -274,7 +274,7 @@ private const val LAUNCH_MIN_MS = 1_400L
 private const val STARTUP_QUIET_MS = 1_500L
 
 private enum class Section(val label: String) {
-    All("All"), Sport("Sport"), Israel("Israeli TV"), Favorites("Favorites"), Recent("Recent"), Playlists("Playlists")
+    All("All"), Sport("Sport"), Israel("Israeli TV"), Favorites("Favorites"), Playlists("Playlists")
 }
 
 private sealed interface HomeDialog {
@@ -564,10 +564,6 @@ private fun HomeScreen(
             Section.Sport -> sportPicked
             Section.Israel -> israelPicked
             Section.Favorites -> scoped.filter { it.favorite }
-            Section.Recent -> {
-                val saved = channels.associateBy { it.url }
-                recent.map { saved[it.url] ?: it }.filter { kindFilter == null || it.kind in kindFilter!!.kinds }
-            }
             Section.Playlists -> emptyList()
         }
         base.filter {
@@ -1023,8 +1019,8 @@ private fun HomeScreen(
                             onRename = { dialog = HomeDialog.Rename(ch) },
                             onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
                             onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
-                            onRemove = { if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url) },
-                            removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
+                            onRemove = { store.remove(ch.url) },
+                            removeLabel = "Delete channel",
                             onAir = NowNext.of(guides[ch.url], nowSeconds),
                             onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
                             fillHeight = true,
@@ -1067,9 +1063,9 @@ private fun HomeScreen(
                                     dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
                                 })
                                 AppMenuItem(text = { Text("Copy link") }, onClick = { close(); clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") })
-                                AppMenuItem(text = { Text(if (section == Section.Recent) "Remove from recent" else "Delete channel") }, onClick = {
+                                AppMenuItem(text = { Text("Delete channel") }, onClick = {
                                     close()
-                                    if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url)
+                                    store.remove(ch.url)
                                 })
                             },
                         )
@@ -1103,9 +1099,9 @@ private fun HomeScreen(
                                 }
                             },
                             onRemove = {
-                                if (section == Section.Recent) store.removeRecent(ch.url) else store.remove(ch.url)
+                                store.remove(ch.url)
                             },
-                            removeLabel = if (section == Section.Recent) "Remove from recent" else "Delete channel",
+                            removeLabel = "Delete channel",
                             onAir = NowNext.of(guides[ch.url], nowSeconds),
                             onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
                         )
@@ -1629,7 +1625,6 @@ private fun EmptyState(section: Section, filtered: Boolean) {
     val text = when {
         filtered -> "No channels match your search."
         section == Section.Favorites -> "No favorites yet. Tap the star next to a channel to pin it here."
-        section == Section.Recent -> "Channels you play will show up here."
         section == Section.Israel -> "No Israeli channels found. They show up here once your account has Channel 11, 12, 13, 14 or 15."
         section == Section.Sport -> "No sport channels found. They show up here once your account has Sport 1–6, Sport 5 or ONE."
         section == Section.Playlists -> ""

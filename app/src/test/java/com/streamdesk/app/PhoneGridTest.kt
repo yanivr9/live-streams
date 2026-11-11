@@ -3,7 +3,9 @@ package com.streamdesk.app
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,6 +39,7 @@ class PhoneGridTest {
             compose.mainClock.autoAdvance = false
             fun settle() { compose.mainClock.advanceTimeBy(2_000); shadowOf(android.os.Looper.getMainLooper()).idle() }
             settle()
+            compose.onAllNodesWithText("Recent").assertCountEquals(0)   // the phone has no Recent tab
             compose.onNodeWithText("Sport").performClick(); settle()
             compose.onNodeWithContentDescription("Show as grid").performClick(); settle()
             assertTrue(PhoneView.isGrid(context))

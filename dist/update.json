@@ -1,6 +1,6 @@
 {
-  "versionCode": 84,
-  "versionName": "3.63",
+  "versionCode": 85,
+  "versionName": "3.64",
   "apk": "StreamDesk.apk",
-  "notes": "Phone: switch the channels between list and grid (3 across) with the new button at the top"
+  "notes": "Phone: the Recent tab is gone (All, Sport, Israeli TV, Favorites, Playlists)"
 }
