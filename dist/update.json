@@ -1,6 +1,6 @@
 {
-  "versionCode": 85,
-  "versionName": "3.64",
+  "versionCode": 86,
+  "versionName": "3.65",
   "apk": "StreamDesk.apk",
-  "notes": "Phone: the Recent tab is gone (All, Sport, Israeli TV, Favorites, Playlists)"
+  "notes": "Phone: the app's logo in the top bar, and a floating Add playlist button at the bottom"
 }

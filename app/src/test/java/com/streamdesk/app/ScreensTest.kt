@@ -89,8 +89,8 @@ class PhoneScreensTest {
     fun addingChannelsOpensWithBothChoices() {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()
-            // The add button in the top bar goes straight to the Add channels window
-            compose.onNodeWithContentDescription("Add channels").performClick()
+            // The floating "Add playlist" button goes straight to the Add channels window
+            compose.onNodeWithText("Add playlist", useUnmergedTree = true).performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Username & password").assertExists()
             compose.onNodeWithText("Playlist link").assertExists()

@@ -105,6 +105,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -673,9 +677,12 @@ private fun HomeScreen(
                             else Icon(Icons.Default.GridView, contentDescription = "Show as grid", tint = Amber)
                         }
                     }
-                    Box {
-                        IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }, modifier = Modifier.tvFocusRing()) {
-                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
+                    // On a phone, adding channels is the floating "Add playlist" button at the bottom
+                    if (LocalIsTv.current) {
+                        Box {
+                            IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }, modifier = Modifier.tvFocusRing()) {
+                                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
+                            }
                         }
                     }
                     Box {
@@ -762,7 +769,13 @@ private fun HomeScreen(
             if (!isTv) TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).background(OnAir, CircleShape))
+                        // The app's logo (the same as on the loading screen), on a small rounded tile
+                        Box(
+                            Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Image(painterResource(R.drawable.splash_icon), contentDescription = "Stream Desk logo", modifier = Modifier.requiredSize(58.dp))
+                        }
                         Spacer(Modifier.width(12.dp))
                         Text("Stream Desk", fontWeight = FontWeight.SemiBold)
                     }
@@ -771,6 +784,17 @@ private fun HomeScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            if (!isTv) {
+                ExtendedFloatingActionButton(
+                    onClick = { dialog = HomeDialog.AddPlaylist() },
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("Add playlist", fontWeight = FontWeight.SemiBold) },
+                    containerColor = Amber,
+                    contentColor = FocusInk,
+                )
+            }
+        },
     ) { padding ->
         // Scrolling the channels with a finger closes the keyboard (for example after typing in the search box)
         val keyboard = LocalSoftwareKeyboardController.current
@@ -1035,7 +1059,7 @@ private fun HomeScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 108.dp),
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 96.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -1074,7 +1098,7 @@ private fun HomeScreen(
                 }
             } else {
                 key(section, group, sourceFilter) {
-                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
+                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 96.dp)) {
                     itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
                         // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
                         LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
@@ -1301,7 +1325,7 @@ private fun PlaylistsPane(
 ) {
     val loading = progress.keys
     val pending = loading.filter { link -> sources.none { it.url == link } }
-    LazyColumn(modifier, contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(modifier, contentPadding = PaddingValues(bottom = 96.dp)) {
         item {
             Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Icon(Icons.Default.Add, contentDescription = null)
