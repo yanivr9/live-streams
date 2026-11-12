@@ -1,6 +1,6 @@
 {
-  "versionCode": 90,
-  "versionName": "3.69",
+  "versionCode": 91,
+  "versionName": "3.70",
   "apk": "StreamDesk.apk",
-  "notes": "Phone: a ☰ side menu with channels, sharing, settings and help (replaces the ⋮ menu)"
+  "notes": "Phone settings in the ☰ menu: video quality, lower quality on mobile data, open on last channel, small window when leaving, CH +/− buttons on the picture"
 }
