@@ -1,6 +1,6 @@
 {
-  "versionCode": 92,
-  "versionName": "3.71",
+  "versionCode": 93,
+  "versionName": "3.72",
   "apk": "StreamDesk.apk",
-  "notes": "All phone settings on their own Settings screen (☰ → Settings)"
+  "notes": "TV guide works again on accounts saved as https:// on a plain-http port (8080)"
 }
