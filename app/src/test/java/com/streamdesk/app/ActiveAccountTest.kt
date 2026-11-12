@@ -38,8 +38,7 @@ class ActiveAccountTest {
         ChannelStore.resetForTests()
 
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.mainClock.autoAdvance = false
-            fun settle() { compose.mainClock.advanceTimeBy(2_000); shadowOf(android.os.Looper.getMainLooper()).idle() }
+            fun settle() = compose.waitForIdle()
             settle()
             compose.onNodeWithText("Playlists").performScrollTo().performClick(); settle()
             compose.onNodeWithContentDescription("Use Friend").performClick(); settle()
