@@ -266,7 +266,7 @@ class MainActivity : ComponentActivity() {
         if (uri.scheme == "streamdesk" && uri.host == "login") {   // an account shared from another phone as a QR code
             val parsed = LoginQr.parse(uri.toString())
             if (parsed != null) sharedLogin = parsed
-            else Toast.makeText(this, "That QR code doesn't hold a Stream Desk account.", Toast.LENGTH_LONG).show()
+            else Toast.makeText(this, "That QR code doesn't hold a Livio account.", Toast.LENGTH_LONG).show()
             return
         }
         if (uri.scheme == "streamdesk") {   // the link behind a TV's QR code
@@ -521,7 +521,7 @@ private fun HomeScreen(
             }
             val parsed = LoginQr.parse(found)
             if (parsed != null) dialog = HomeDialog.SharedLogin(parsed.first, parsed.second)
-            else notify(if (found == null) "No QR code found in that picture." else "That QR code isn't a Stream Desk account.")
+            else notify(if (found == null) "No QR code found in that picture." else "That QR code isn't a Livio account.")
         }
     }
     // A new version, if there is one: ask once when the app opens
@@ -537,9 +537,9 @@ private fun HomeScreen(
         delay(STARTUP_QUIET_MS)
         val what = if (n == 1) "a problem" else "$n problems"
         if (context.isTelevision()) {
-            notify("Stream Desk had $what. To send the details, on your phone: ⋮ → Problems from TV.")
+            notify("Livio had $what. To send the details, on your phone: ⋮ → Problems from TV.")
         } else {
-            val r = snackbar.showSnackbar("Stream Desk had $what.", actionLabel = "Send report", withDismissAction = true, duration = SnackbarDuration.Long)
+            val r = snackbar.showSnackbar("Livio had $what.", actionLabel = "Send report", withDismissAction = true, duration = SnackbarDuration.Long)
             if (r == SnackbarResult.ActionPerformed) dialog = HomeDialog.Report(Problems.report(context))
             else Problems.markSeen(context)
         }
@@ -875,10 +875,10 @@ private fun HomeScreen(
                                 Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Image(painterResource(R.drawable.splash_icon), contentDescription = "Stream Desk logo", modifier = Modifier.requiredSize(58.dp))
+                                Image(painterResource(R.drawable.splash_icon), contentDescription = "Livio logo", modifier = Modifier.requiredSize(58.dp))
                             }
                             Spacer(Modifier.width(12.dp))
-                            Text("Stream Desk", fontWeight = FontWeight.SemiBold)
+                            BrandName(style = MaterialTheme.typography.titleLarge)
                         }
                     },
                     actions = topActions,
@@ -1369,7 +1369,7 @@ private fun HomeScreen(
         HomeDialog.About -> AlertDialog(
             onDismissRequest = { dialog = null },
             icon = { Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(72.dp)) },
-            title = { Text("Stream Desk") },
+            title = { BrandName(style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Text(
                     "Version ${runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()}\n\n" +
@@ -1416,7 +1416,7 @@ private fun HomeScreen(
         )
         is HomeDialog.Crash -> AlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Stream Desk stopped unexpectedly") },
+            title = { Text("Livio stopped unexpectedly") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sorry about that. Copy these details and send them to whoever builds the app so it can be fixed. Passwords are removed.")
@@ -1557,7 +1557,7 @@ private fun PlaylistsPane(
         }
         if (sources.isEmpty() && pending.isEmpty()) item {
             Text(
-                "Add the link to an M3U channel list, or sign in with the server, username and password from your IPTV provider (+ button above). Stream Desk adds the channels to your list and updates them once a day.",
+                "Add the link to an M3U channel list, or sign in with the server, username and password from your IPTV provider (+ button above). Livio adds the channels to your list and updates them once a day.",
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,

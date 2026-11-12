@@ -57,7 +57,7 @@ object Problems {
         val clock = SimpleDateFormat("dd/MM HH:mm:ss", Locale.US)
         val problems = read(context)
         return buildString {
-            appendLine("Stream Desk $version problem report · $device · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}")
+            appendLine("Livio $version problem report · $device · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}")
             appendLine()
             if (problems.isEmpty()) appendLine("No problems recorded.")
             else problems.forEach { appendLine("${clock.format(Date(it.time))} [${it.kind}] ${it.message}") }
@@ -70,7 +70,7 @@ object Problems {
     /** Opens Android's share menu (WhatsApp, email, …) with the report. */
     fun share(context: Context, text: String) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-            .putExtra(Intent.EXTRA_SUBJECT, "Stream Desk problem report")
+            .putExtra(Intent.EXTRA_SUBJECT, "Livio problem report")
             .putExtra(Intent.EXTRA_TEXT, text)
         context.startActivity(Intent.createChooser(send, "Send problem report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

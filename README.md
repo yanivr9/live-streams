@@ -1,4 +1,4 @@
-# Stream Desk for Android
+# Livio for Android
 
 Open a network stream by link, like VLC's "Open Network Stream", and keep a channel list.
 
@@ -22,13 +22,13 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   Switches on automatically on a TV; phones are unchanged.
   Number keys type a channel number (3, or 1 then 2 for 12; OK goes at once). Fast-forward and rewind also change channel.
   The Logs screen lists each remote key the app receives ("Remote key: …"), to see what a TV's remote passes on over HDMI.
-- **Play on TV**: from the phone, send a channel (and its list) to Stream Desk on a TV box over the home Wi-Fi, then use the
+- **Play on TV**: from the phone, send a channel (and its list) to Livio on a TV box over the home Wi-Fi, then use the
   phone as a remote (CH +/−, stop). Also sends the IPTV login and Sport list to the TV, so nothing is typed with the remote.
   The TV announces itself on the network and shows a QR code and a 6-digit pairing code (cast icon → Link a phone); wrong
   codes are locked out. Scanning the QR code with the phone's camera opens a page on the TV with a button that starts
-  Stream Desk on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
+  Livio on the phone (`streamdesk://connect?host=…&code=…`, accepted only for home-network addresses) and offers to
   send the login.
-- **Problem reports**: crashes, channels that end on an error, and failed sign-ins or playlist downloads are written down on each device (passwords hidden). The phone shows "Stream Desk had a problem – Send report" and ⋮ → Send problem report opens Android's share menu with the report; the TV's report reaches the phone through ⋮ → Problems from TV.
+- **Problem reports**: crashes, channels that end on an error, and failed sign-ins or playlist downloads are written down on each device (passwords hidden). The phone shows "Livio had a problem – Send report" and ⋮ → Send problem report opens Android's share menu with the report; the TV's report reaches the phone through ⋮ → Problems from TV.
 - **Logs from TV**: on the phone, ⋮ → Logs from TV shows the TV's activity log (passwords hidden) with a Copy button, since copying on a TV box goes nowhere.
 - **Continue on phone**: ⋮ → Continue from TV on the phone (or Play here on the phone's remote screen) stops the TV and carries on
   with the same channel on the phone, so only one screen uses the account at a time.

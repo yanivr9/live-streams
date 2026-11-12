@@ -49,7 +49,7 @@ fun DrawerColumn(version: String, account: String?, accountDetail: String?, onAc
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Stream Desk", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                BrandName(style = MaterialTheme.typography.titleLarge)
                 Text("Version $version", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -172,7 +172,7 @@ fun SettingsScreen(version: String, onDismiss: () -> Unit, content: @Composable 
             Column(Modifier.padding(padding).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
                 content()
                 Text(
-                    "Stream Desk $version",
+                    "Livio $version",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 22.dp, top = 24.dp),

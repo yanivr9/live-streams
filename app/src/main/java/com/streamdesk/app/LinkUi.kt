@@ -111,7 +111,7 @@ fun TvPickerDialog(title: String, onDismiss: () -> Unit, onChosen: (TvDevice, St
                         }
                     }
                     Text(
-                        "Open Stream Desk on the TV first. The phone and the TV must use the same Wi-Fi.",
+                        "Open Livio on the TV first. The phone and the TV must use the same Wi-Fi.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -182,7 +182,7 @@ fun QrCode(text: String, size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** The address the QR code points to: a page on the TV that opens Stream Desk on the phone. */
+/** The address the QR code points to: a page on the TV that opens Livio on the phone. */
 private fun connectUrl(code: String): String? =
     LinkReceiver.address()?.let { "http://$it:${LinkReceiver.port}/connect?c=$code" }
 
@@ -202,8 +202,8 @@ fun LinkPhoneCard(modifier: Modifier = Modifier) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Connect your phone, so you don't type with the remote", fontWeight = FontWeight.Bold)
                 Text(
-                    if (url != null) "Scan the QR code with your phone's camera, tap Open Stream Desk, then send your login. Or type the code in the app: Playlists → ⋮ next to your account → Send login to TV."
-                    else "On your phone: Stream Desk → Playlists → ⋮ next to your account → Send login to TV. Choose this TV and type the code.",
+                    if (url != null) "Scan the QR code with your phone's camera, tap Open Livio, then send your login. Or type the code in the app: Playlists → ⋮ next to your account → Send login to TV."
+                    else "On your phone: Livio → Playlists → ⋮ next to your account → Send login to TV. Choose this TV and type the code.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -232,8 +232,8 @@ fun LinkPhoneDialog(onDismiss: () -> Unit) {
                 if (url != null) QrCode(url, 230.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        if (url != null) "Scan the QR code with your phone's camera, then tap Open Stream Desk."
-                        else "On your phone: Stream Desk → Playlists → ⋮ next to your account → Send login to TV (or ⋮ on a channel → Play on TV). Choose this TV and type this code.",
+                        if (url != null) "Scan the QR code with your phone's camera, then tap Open Livio."
+                        else "On your phone: Livio → Playlists → ⋮ next to your account → Send login to TV (or ⋮ on a channel → Play on TV). Choose this TV and type this code.",
                     )
                     Text("Or type this code in the app:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(code.chunked(3).joinToString(" "), fontSize = 36.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Amber)
@@ -241,7 +241,7 @@ fun LinkPhoneDialog(onDismiss: () -> Unit) {
                         if (address != null) "If the phone can't find the TV, type this address: $address" else "This TV isn't connected to a network.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text("Keep Stream Desk open on the TV while you send to it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Keep Livio open on the TV while you send to it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },

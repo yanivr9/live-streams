@@ -54,7 +54,7 @@ import java.io.File
 
 /**
  * An account passed from one phone to another as a QR code (no link): streamdesk://login?d=<the login>&n=<its name>.
- * The friend's Stream Desk reads it from a picture in the gallery, or the phone's own camera opens it in the app.
+ * The friend's Livio reads it from a picture in the gallery, or the phone's own camera opens it in the app.
  */
 object LoginQr {
     private const val FLAGS = Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
@@ -65,7 +65,7 @@ object LoginQr {
         return "streamdesk://login?d=$data$n"
     }
 
-    /** The login and its name from a QR code's text; null when it isn't a Stream Desk account. */
+    /** The login and its name from a QR code's text; null when it isn't a Livio account. */
     fun parse(text: String?): Pair<XtreamLogin, String?>? {
         val uri = runCatching { Uri.parse(text?.trim() ?: return null) }.getOrNull() ?: return null
         if (uri.scheme != "streamdesk" || uri.host != "login") return null
@@ -124,13 +124,13 @@ object LoginQr {
         return qr
     }
 
-    /** Saves the QR code to the gallery (Pictures/Stream Desk); false if it couldn't. */
+    /** Saves the QR code to the gallery (Pictures/Livio); false if it couldn't. */
     fun save(context: Context, text: String, name: String): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "Stream Desk - ${name.replace(Regex("[^A-Za-z0-9 ._-]"), "")}.png")
+            put(MediaStore.Images.Media.DISPLAY_NAME, "Livio - ${name.replace(Regex("[^A-Za-z0-9 ._-]"), "")}.png")
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Stream Desk")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Livio")
         }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
         return runCatching {
@@ -141,7 +141,7 @@ object LoginQr {
     /** Opens the share sheet (WhatsApp, …) with the QR code as a picture. */
     fun send(context: Context, text: String) {
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "Stream Desk account.png")
+        val file = File(dir, "Livio account.png")
         file.outputStream().use { card(context, text).compress(Bitmap.CompressFormat.PNG, 100, it) }
         val uri = FileProvider.getUriForFile(context, context.packageName + ".files", file)
         val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -162,7 +162,7 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "On the other phone: Stream Desk → + Add playlist → QR code",
+                    "On the other phone: Livio → + Add playlist → QR code",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -179,7 +179,7 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         OutlinedButton(onClick = {
-                            onDone(if (LoginQr.save(context, text, source.name)) "Saved to Pictures › Stream Desk." else "Couldn't save the picture.")
+                            onDone(if (LoginQr.save(context, text, source.name)) "Saved to Pictures › Livio." else "Couldn't save the picture.")
                         }) { Text("Save picture") }
                     }
                     Button(

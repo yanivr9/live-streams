@@ -1,4 +1,4 @@
-# Stream Desk for Windows
+# Livio for Windows
 
 The TV app's essentials on a PC: sign in, Sport / Israeli TV / All tabs with logos (a coloured name tile when a channel has none) and what's on now, a loading screen, a clear white highlight, and a player with a glass guide bar along the bottom (logo, number, LIVE, what's on with its progress, what's next).
 It is the LG version's screens (`../webos`) in an Electron window, with hls.js and mpegts.js playing the streams
@@ -15,13 +15,13 @@ It is the LG version's screens (`../webos`) in an Electron window, with hls.js a
 
 ## Install
 
-Unzip `StreamDesk-Windows.zip` anywhere (for example Documents) and run `Stream Desk.exe` in the folder.
+Unzip `Livio-Windows.zip` anywhere (for example Documents) and run `Livio.exe` in the folder.
 Windows may warn that the program is from an unknown publisher: More info → Run anyway.
 
 ## Build
 
 ```sh
 npm install
-npm run dist     # → out/Stream Desk-win32-x64 (zip it to hand it over; it's ~100 MB, too big for a git file)
+npm run dist     # → out/Livio-win32-x64 (zip it to hand it over; it's ~100 MB, too big for a git file)
 npm start        # run it on this computer
 ```

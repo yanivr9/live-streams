@@ -63,7 +63,7 @@ object LinkReceiver {
         if (server != null) return
         val app = context.applicationContext
         val version = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull().orEmpty()
-        val s = LinkServer("Stream Desk (${Build.MODEL})", version, { code(app) }, AndroidHandler(app))
+        val s = LinkServer("Livio (${Build.MODEL})", version, { code(app) }, AndroidHandler(app))
         val port = runCatching { s.start() }.getOrElse {
             AppLog.e("link", "Couldn't start the phone link", it)
             return
@@ -80,7 +80,7 @@ object LinkReceiver {
                 override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
             }
             val info = NsdServiceInfo().apply {
-                serviceName = "Stream Desk (${Build.MODEL})"
+                serviceName = "Livio (${Build.MODEL})"
                 serviceType = LINK_SERVICE_TYPE
                 setPort(port)
             }
@@ -98,7 +98,7 @@ object LinkReceiver {
             main.post {
                 runCatching {
                     app.startActivity(PlayerActivity.intent(app, queue, index, StreamFormat.Auto).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }.onFailure { AppLog.e("link", "Couldn't open the player (keep Stream Desk open on the TV)", it) }
+                }.onFailure { AppLog.e("link", "Couldn't open the player (keep Livio open on the TV)", it) }
             }
         }
 

@@ -1,4 +1,4 @@
-// Stream Desk for Windows: the TV app's screens (from webos/) in a window, with a player library for the streams.
+// Livio for Windows: the TV app's screens (from webos/) in a window, with a player library for the streams.
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 
@@ -13,7 +13,7 @@ function open() {
     minWidth: 960,
     minHeight: 540,
     backgroundColor: '#0E1113',
-    title: 'Stream Desk',
+    title: 'Livio',
     icon: path.join(__dirname, 'app', 'largeIcon.png'),
     autoHideMenuBar: true,
     webPreferences: {

@@ -1,10 +1,10 @@
 {
   "id": "com.streamdesk.tv",
-  "version": "1.1.0",
-  "vendor": "Stream Desk",
+  "version": "1.2.0",
+  "vendor": "Livio",
   "type": "web",
   "main": "index.html",
-  "title": "Stream Desk",
+  "title": "Livio",
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",
   "bgColor": "#0E1113",

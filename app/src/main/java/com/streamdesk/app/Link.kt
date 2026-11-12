@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
 const val LINK_PORT = 8765
 const val LINK_SERVICE_TYPE = "_streamdesk._tcp."
 
-/** A TV running Stream Desk, as found on the network. */
+/** A TV running Livio, as found on the network. */
 data class TvDevice(val name: String, val host: String, val port: Int = LINK_PORT)
 
 /** Sign-in details sent from the phone. */
@@ -109,7 +109,7 @@ class LinkServer(
                     if (line.isEmpty()) break
                     headers[line.substringBefore(':').trim().lowercase()] = line.substringAfter(':', "").trim()
                 }
-                // The QR code on the TV opens this page on the phone: a button that starts Stream Desk with the TV's details
+                // The QR code on the TV opens this page on the phone: a button that starts Livio with the TV's details
                 val path = parts[1].substringBefore('?')
                 if (parts[0] == "GET" && path == "/connect") {
                     val given = queryParam(parts[1], "c")
@@ -186,13 +186,13 @@ class LinkServer(
         val query = "host=$host&port=$port&code=$code&name=$name"
         val intent = "intent://connect?$query#Intent;scheme=streamdesk;package=com.streamdesk.app;end"
         val spaced = code.chunked(3).joinToString(" ")
-        return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stream Desk</title>
+        return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Livio</title>
 <style>body{font-family:sans-serif;background:#0e1113;color:#e3e8ea;text-align:center;padding:32px 20px}h2{margin-bottom:8px}
 a.b{display:block;margin:28px auto;max-width:360px;padding:18px;border-radius:12px;background:#ff9f1c;color:#1a1205;font-weight:700;font-size:20px;text-decoration:none}
 .c{font:700 34px monospace;color:#ff9f1c;margin:10px 0}p{color:#c4cdd2;line-height:1.5}</style></head>
-<body><h2>Connect to ${htmlEscape(deviceName)}</h2><p>Tap the button to open Stream Desk on this phone.</p>
-<a class="b" href="$intent">Open Stream Desk</a>
-<p>If nothing happens, install Stream Desk on this phone, or open it and use Playlists, then the three dots, then Send login to TV, and type this code:</p>
+<body><h2>Connect to ${htmlEscape(deviceName)}</h2><p>Tap the button to open Livio on this phone.</p>
+<a class="b" href="$intent">Open Livio</a>
+<p>If nothing happens, install Livio on this phone, or open it and use Playlists, then the three dots, then Send login to TV, and type this code:</p>
 <div class="c">$spaced</div></body></html>"""
     }
 
@@ -247,12 +247,12 @@ a.b{display:block;margin:28px auto;max-width:360px;padding:18px;border-radius:12
 
 /** The sending side, used by the phone. All calls block: run them off the main thread. */
 object LinkClient {
-    private const val NOT_REACHED = "Can't reach the TV. Open Stream Desk on the TV, and make sure both are on the same Wi-Fi."
+    private const val NOT_REACHED = "Can't reach the TV. Open Livio on the TV, and make sure both are on the same Wi-Fi."
 
-    /** Checks that Stream Desk is listening at the address; returns the TV's name. */
+    /** Checks that Livio is listening at the address; returns the TV's name. */
     fun ping(host: String, port: Int = LINK_PORT): TvDevice {
         val json = request("GET", host, port, "/ping", null, "")
-        if (json.optString("app") != "streamdesk") throw LinkException(LinkException.Kind.Other, "That address isn't a Stream Desk TV.")
+        if (json.optString("app") != "streamdesk") throw LinkException(LinkException.Kind.Other, "That address isn't a Livio TV.")
         return TvDevice(json.optString("name").ifBlank { host }, host, port)
     }
 
@@ -315,7 +315,7 @@ object LinkClient {
                 403 -> throw LinkException(LinkException.Kind.WrongCode, "Wrong code. Check the code shown on the TV under ⋮ → Link a phone.")
                 409 -> throw LinkException(LinkException.Kind.Other, "Nothing is playing on the TV right now.")
                 429 -> throw LinkException(LinkException.Kind.TooManyTries, "Too many wrong codes. Wait a minute and try again.")
-                else -> throw LinkException(LinkException.Kind.Other, "The TV answered with an error (HTTP $status). Update Stream Desk on both devices.")
+                else -> throw LinkException(LinkException.Kind.Other, "The TV answered with an error (HTTP $status). Update Livio on both devices.")
             }
         } finally {
             conn.disconnect()

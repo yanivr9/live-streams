@@ -84,7 +84,7 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
                     Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Amber, modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(16.dp))
                     Text("A new version is ready", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                    Text("Stream Desk ${info.name}", color = Amber, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
+                    Text("Livio ${info.name}", color = Amber, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
                     if (info.notes.isNotBlank()) {
                         Text(info.notes, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
                     }

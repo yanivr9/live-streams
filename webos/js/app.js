@@ -1,5 +1,5 @@
 /*
- * Stream Desk for LG webOS: the TV side of the Android app's essentials. Sign in to the IPTV (Xtream) account,
+ * Livio for LG webOS: the TV side of the Android app's essentials. Sign in to the IPTV (Xtream) account,
  * the Sport and Israeli TV tabs with logos and what's on now, all channels in the chosen folders, and a full-screen
  * player driven by the Magic Remote (CH +/−, arrows, number keys, OK, Back).
  * Written in ES5 because webOS 4 (2018 TVs) runs Chrome 53.

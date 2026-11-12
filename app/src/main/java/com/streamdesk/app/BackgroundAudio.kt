@@ -56,7 +56,7 @@ class PlaybackService : Service() {
         )
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(intent?.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "Stream Desk" })
+            .setContentTitle(intent?.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "Livio" })
             .setContentText("Playing · tap to open")
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stop)

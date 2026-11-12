@@ -12,12 +12,12 @@ class App : Application() {
         AppLog.init(filesDir)
         if (isTelevision()) LinkReceiver.start(this)
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull()
-        AppLog.i("app", "Started Stream Desk $version on Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})")
+        AppLog.i("app", "Started Livio $version on Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})")
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
             AppLog.e("app", "Crashed", e)
             runCatching {
-                val report = "Stream Desk $version · Android ${Build.VERSION.RELEASE} · ${Build.MANUFACTURER} ${Build.MODEL}\n\n" +
+                val report = "Livio $version · Android ${Build.VERSION.RELEASE} · ${Build.MANUFACTURER} ${Build.MODEL}\n\n" +
                     redact(e.stackTraceToString()).take(8_000)
                 File(filesDir, CRASH_FILE).writeText(report)
             }

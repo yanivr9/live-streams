@@ -43,11 +43,33 @@ fun LaunchScreen(modifier: Modifier = Modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(168.dp).scale(scale))
             Spacer(Modifier.height(8.dp))
-            Text("Stream Desk", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = Color(0xFFECEFF1))
+            BrandName(style = MaterialTheme.typography.displaySmall, color = Color(0xFFECEFF1))
+            Text("Live TV, everywhere", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFC4CDD2))
             Spacer(Modifier.height(20.dp))
             LinearProgressIndicator(modifier = Modifier.width(200.dp), color = Color(0xFFFF9F1C), trackColor = Color(0xFF1E272C))
             Spacer(Modifier.height(12.dp))
             Text("Loading your channels…", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF9AA5AB))
         }
     }
+}
+
+/** The app's name as it appears in the app: "Livio", with the last "o" in orange. */
+@Composable
+fun BrandName(
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color = androidx.compose.ui.graphics.Color.Unspecified,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        androidx.compose.ui.text.buildAnnotatedString {
+            append("Livi")
+            pushStyle(androidx.compose.ui.text.SpanStyle(color = Amber))
+            append("o")
+            pop()
+        },
+        style = style,
+        fontWeight = FontWeight.Bold,
+        color = color,
+        modifier = modifier,
+    )
 }

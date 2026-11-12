@@ -1,4 +1,4 @@
-# Stream Desk for LG webOS
+# Livio for LG webOS
 
 The essentials of the Android app, running on the LG TV itself (webOS 4, 2018, and later):
 sign-in to the IPTV (Xtream) account, the Sport and Israeli TV tabs with logos and what's on now,
