@@ -41,5 +41,7 @@ class PlainHttpTest {
         // Remembered: the next request to that server goes to http straight away
         assertEquals("http://127.0.0.1:$port/player_api.php?x=1", PlainHttp.rewrite("https://127.0.0.1:$port/player_api.php?x=1"))
         assertEquals("https://example.com/a", PlainHttp.rewrite("https://example.com/a"))
+        assertEquals("http://example.com/a", PlainHttp.rewrite("http://example.com/a"))   // plain links untouched
+        assertEquals("not a link", PlainHttp.rewrite("not a link"))
     }
 }

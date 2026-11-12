@@ -68,7 +68,10 @@ object PlainHttp {
 
     fun toHttp(link: String): String? = if (key(link) != null) "http" + link.substring("https".length) else null
     fun remember(link: String) { key(link)?.let { hosts += it } }
-    fun rewrite(link: String): String = if (key(link) in hosts) toHttp(link) ?: link else link
+    fun rewrite(link: String): String {
+        val k = key(link) ?: return link   // http:// and other links pass through untouched (the set can't hold null)
+        return if (k in hosts) toHttp(link) ?: link else link
+    }
 }
 
 /**
