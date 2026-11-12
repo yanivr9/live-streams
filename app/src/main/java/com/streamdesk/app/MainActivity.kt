@@ -886,7 +886,7 @@ private fun HomeScreen(
             },
             snackbarHost = { SnackbarHost(snackbar) },
             floatingActionButton = {
-                if (!isTv) {
+                if (!isTv && section != Section.Playlists) {   // the Playlists tab has its own big Add button
                     ExtendedFloatingActionButton(
                         expanded = fabExpanded,
                         onClick = { dialog = HomeDialog.AddPlaylist() },
@@ -1155,7 +1155,7 @@ private fun HomeScreen(
                     // The phone's grid: 3 cards across when held upright, more on a tablet or sideways
                     key(section, group, sourceFilter) {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 108.dp),
+                        columns = GridCells.Adaptive(minSize = 100.dp),   // 3 across on any phone held upright (360 dp and up)
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 96.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1246,7 +1246,7 @@ private fun HomeScreen(
                 if (drawerState.currentValue == DrawerValue.Open || drawerState.targetValue == DrawerValue.Open) DrawerColumn(
                     version = appVersion,
                     account = mainAccount?.name,
-                    accountDetail = mainAccount?.let { "%,d channels".format(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · updated " + DateUtils.getRelativeTimeSpanString(it.updatedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS) else "" },
+                    accountDetail = mainAccount?.let { "%,d channels".format(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · updated " + updatedAgo(it.updatedAt) else "" },
                     onAccount = { closeDrawer(); section = Section.Playlists },
                 ) {
                     fun go(s: Section) { closeDrawer(); section = s; sourceFilter = null; group = null }
@@ -1593,8 +1593,8 @@ private fun PlaylistsPane(
                         Text(
                             if (s.url in loading) progress[s.url].orEmpty()
                             else if (s.updatedAt == 0L) (if (s.xtream != null) "${s.xtream.username} · not loaded yet" else "Not loaded yet")
-                            else if (s.xtream != null) "Signed in as ${s.xtream.username} · updated ${DateUtils.getRelativeTimeSpanString(s.updatedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)}"
-                            else "${s.channelCount} channels · updated ${DateUtils.getRelativeTimeSpanString(s.updatedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)}",
+                            else if (s.xtream != null) "Signed in as ${s.xtream.username} · updated ${updatedAgo(s.updatedAt)}"
+                            else "${s.channelCount} channels · updated ${updatedAgo(s.updatedAt)}",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         MonoLine(s.xtream?.base ?: s.url)
@@ -2298,3 +2298,8 @@ private fun SportListEditor(initial: SportSettings, onDismiss: () -> Unit, onSav
         },
     )
 }
+
+/** "just now", "5 minutes ago", "yesterday": when a playlist was last updated. */
+private fun updatedAgo(at: Long): String =
+    if (System.currentTimeMillis() - at < 60_000) "just now"
+    else DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()

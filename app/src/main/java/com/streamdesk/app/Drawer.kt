@@ -100,9 +100,10 @@ fun DrawerRow(
             .padding(end = 14.dp)
             .fillMaxWidth()
             .height(48.dp)
-            .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-            .background(if (selected) Amber.copy(alpha = 0.14f) else Color.Transparent)
+            // The tap goes on the whole line first, then the rounded highlight is painted (a clip with uneven corners in
+            // front of the tap area can swallow touches)
             .clickable(role = Role.Button, onClick = onClick)
+            .background(if (selected) Amber.copy(alpha = 0.14f) else Color.Transparent, RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
             .padding(start = 22.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

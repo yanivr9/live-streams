@@ -127,6 +127,8 @@ object Xtream {
             AppLog.i("signin", "https:// failed; trying ${plain.base} (plain http)")
             fetchText(plain.api(), preferredUserAgent).also { effective = plain }
         }
+        // fetchText may have switched an https:// address that only speaks http to plain http: use (and save) that
+        if (PlainHttp.rewrite(effective.api()) != effective.api()) effective = effective.copy(server = "http://" + effective.base.substring("https://".length))
         val login = effective
         val ua = auth.userAgent
         val root = parseObject(auth.text)

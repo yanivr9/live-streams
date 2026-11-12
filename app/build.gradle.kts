@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 94
-        versionName = "3.73"
+        versionCode = 95
+        versionName = "3.74"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -47,6 +47,7 @@ android {
             System.getProperty("tvshots")?.let { dir -> it.systemProperty("tvshots", dir) }   // pictures of the TV screens, on request
             System.getProperty("qa")?.let { dir -> it.systemProperty("qa", dir) }   // QA walk-through pictures, on request
             System.getProperty("compat")?.let { dir -> it.systemProperty("compat", dir) }   // compatibility-matrix pictures, on request
+            System.getProperty("qashots")?.let { dir -> it.systemProperty("qashots", dir) }   // phone screen pictures for a look-over, on request
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
         }
     }

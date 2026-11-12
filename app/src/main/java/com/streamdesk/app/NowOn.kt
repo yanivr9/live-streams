@@ -58,12 +58,6 @@ object NowOn {
     /** Channel link → its short guide. */
     val guides: StateFlow<Map<String, List<Program>>> = _guides
 
-    /** https:// servers that turned out to answer only on plain http. */
-    private val plainHosts: MutableSet<String> = ConcurrentHashMap.newKeySet()
-
-    private fun plainIfNeeded(login: XtreamLogin) =
-        if (login.base in plainHosts) login.copy(server = "http://" + login.base.substring("https://".length)) else login
-
     /** Fetches the channel's guide unless it's fresh or already on its way. Cheap to call often. */
     fun want(url: String, login: XtreamLogin) {
         if (Epg.streamId(url) == null) return
@@ -73,13 +67,7 @@ object NowOn {
         scope.launch {
             try {
                 parallel.withPermit {
-                    val result = runCatching { Epg.load(plainIfNeeded(login), url) }.recoverCatching { e ->
-                        // A server that only speaks plain http on its port (8080 …) but was saved as https://: try http once
-                        // and remember it for the other channels, instead of failing every guide
-                        if (e !is TlsException || !login.base.startsWith("https://", ignoreCase = true)) throw e
-                        val plain = login.copy(server = "http://" + login.base.substring("https://".length))
-                        Epg.load(plain, url).also { plainHosts += login.base }
-                    }
+                    val result = runCatching { Epg.load(login, url) }   // (an https:// server that only speaks http is handled in fetchText)
                     if (result.isSuccess) {
                         failures = 0
                         fetchedAt[url] = System.currentTimeMillis()

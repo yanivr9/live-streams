@@ -44,8 +44,32 @@ fun httpProblem(code: Int): String = when (code) {
 data class Fetched(val text: String, val userAgent: String)
 
 /** Downloads a playlist. If the server refuses, tries again as other common players. */
-suspend fun fetchText(link: String, preferredUserAgent: String? = null): Fetched =
-    tryClients(link, preferredUserAgent) { ua -> download(link, ua, sniff = false)!! }
+suspend fun fetchText(link: String, preferredUserAgent: String? = null): Fetched {
+    val plainFirst = PlainHttp.rewrite(link)
+    return try {
+        tryClients(plainFirst, preferredUserAgent) { ua -> download(plainFirst, ua, sniff = false)!! }
+    } catch (e: TlsException) {
+        // Many IPTV panels speak only plain http on ports like 8080, though the address was saved as https://:
+        // try http once, and remember the server so its other requests (guide, series…) go there straight away
+        val plain = PlainHttp.toHttp(link) ?: throw e
+        AppLog.i("net", "  https failed; trying plain http")
+        tryClients(plain, preferredUserAgent) { ua -> download(plain, ua, sniff = false)!! }.also { PlainHttp.remember(link) }
+    }
+}
+
+/** https:// servers (host:port) that turned out to answer only on plain http. */
+object PlainHttp {
+    private val hosts: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    private fun key(link: String): String? = runCatching {
+        val u = java.net.URI(link)
+        if (u.scheme.equals("https", ignoreCase = true) && u.host != null) "${u.host.lowercase()}:${u.port}" else null
+    }.getOrNull()
+
+    fun toHttp(link: String): String? = if (key(link) != null) "http" + link.substring("https".length) else null
+    fun remember(link: String) { key(link)?.let { hosts += it } }
+    fun rewrite(link: String): String = if (key(link) in hosts) toHttp(link) ?: link else link
+}
 
 /**
  * For links typed in the main box: returns the text if the link is an M3U channel list,
