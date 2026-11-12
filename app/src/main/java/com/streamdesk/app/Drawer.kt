@@ -48,7 +48,7 @@ fun DrawerColumn(version: String, account: String?, accountDetail: String?, onAc
             Spacer(Modifier.width(12.dp))
             Column {
                 BrandName(style = MaterialTheme.typography.titleLarge)
-                Text("Version $version", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${t("Version")} $version", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (account != null) {
@@ -161,10 +161,10 @@ fun SettingsScreen(version: String, onDismiss: () -> Unit, content: @Composable 
                 androidx.compose.material3.TopAppBar(
                     navigationIcon = {
                         androidx.compose.material3.IconButton(onClick = onDismiss) {
-                            Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back"))
                         }
                     },
-                    title = { Text("Settings") },
+                    title = { Text(t("Settings")) },
                 )
             },
         ) { padding ->

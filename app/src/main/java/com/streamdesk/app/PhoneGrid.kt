@@ -130,7 +130,7 @@ fun PhoneTile(
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = 0.55f))
                 .combinedClickable(onClick = onToggleFavorite)
-                .semantics { contentDescription = if (channel.favorite) "Remove from favorites" else "Add to favorites" },
+                .semantics { contentDescription = if (channel.favorite) t("Remove from favorites") else t("Add to favorites") },
             contentAlignment = Alignment.Center,
         ) {
             if (channel.favorite) Icon(Icons.Default.Star, null, tint = Amber, modifier = Modifier.size(16.dp))

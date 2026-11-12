@@ -46,11 +46,11 @@ fun LaunchScreen(modifier: Modifier = Modifier) {
             AppLogo(104.dp, Modifier.scale(scale))
             Spacer(Modifier.height(8.dp))
             BrandName(style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onBackground)
-            Text("Live TV, everywhere", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(t("Live TV, everywhere"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
             LinearProgressIndicator(modifier = Modifier.width(200.dp), color = Color(0xFFFF9F1C), trackColor = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.height(12.dp))
-            Text("Loading your channels…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(t("Loading your channels…"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

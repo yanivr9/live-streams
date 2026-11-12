@@ -107,6 +107,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.FloatingActionButton
@@ -224,6 +227,7 @@ class MainActivity : ComponentActivity() {
         if (!isTelevision() && resources.configuration.smallestScreenWidthDp < 600) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
         ThemePrefs.load(this)
+        Lang.load(this)
         val firstStart = savedInstanceState == null
         setContent {
             // The status bar's clock and icons follow the app's theme (white on dark, dark on light)
@@ -328,8 +332,11 @@ private const val LAUNCH_MIN_MS = 1_400L
 /** How long work the first screen doesn't need (guide, list refresh, update check) waits after the app opens. */
 private const val STARTUP_QUIET_MS = 1_500L
 
-private enum class Section(val label: String) {
-    All("All"), Sport("Sport"), Israel("Israeli TV"), Favorites("Favorites"), Playlists("Playlists")
+private enum class Section(private val en: String) {
+    All("All"), Sport("Sport"), Israel("Israeli TV"), Favorites("Favorites"), Playlists("Playlists");
+
+    /** The tab's name in the app's language. */
+    val label: String get() = t(en)
 }
 
 private sealed interface HomeDialog {
@@ -428,7 +435,7 @@ private fun HomeScreen(
     fun selectAccount(s: PlaylistSource) {
         store.useOnly(s.url)
         sourceFilter = null; group = null
-        notify("Now showing ${s.name}.")
+        notify(t("Now showing %s.").format(s.name))
     }
 
 
@@ -690,7 +697,7 @@ private fun HomeScreen(
     // The ⋮ entries, shown as a menu on a TV and as a panel from the bottom on a phone
     val moreEntries: @Composable ColumnScope.() -> Unit = {
                             if (sources.isNotEmpty()) {
-                                AppMenuItem(text = { Text("Update all playlists") }, onClick = {
+                                AppMenuItem(text = { Text(t("Update all playlists")) }, onClick = {
                                     moreMenu = false; sources.forEach { loadPlaylist(it.url) }
                                 })
                             }
@@ -704,7 +711,7 @@ private fun HomeScreen(
                             })
                             if (sources.isNotEmpty()) {
                                 AppMenuItem(
-                                    text = { Text(if (linkBarOpen) "Hide the link bar" else "Open a link") },
+                                    text = { Text(if (linkBarOpen) t("Hide the link bar") else "Open a link") },
                                     onClick = { moreMenu = false; linkBarOpen = !linkBarOpen },
                                 )
                             }
@@ -714,13 +721,13 @@ private fun HomeScreen(
                                 })
                             }
                             if (!LocalIsTv.current) {
-                                AppMenuItem(text = { Text("Continue from TV") }, onClick = {
+                                AppMenuItem(text = { Text(t("Continue from TV")) }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.PickTv(TvJob.TakeOver)
                                 })
-                                AppMenuItem(text = { Text("Send problem report") }, onClick = {
+                                AppMenuItem(text = { Text(t("Send problem report")) }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.Report(Problems.report(context))
                                 })
-                                AppMenuItem(text = { Text("Problems from TV") }, onClick = {
+                                AppMenuItem(text = { Text(t("Problems from TV")) }, onClick = {
                                     moreMenu = false; dialog = HomeDialog.PickTv(TvJob.Logs)
                                 })
                             }
@@ -745,16 +752,16 @@ private fun HomeScreen(
                                     moreMenu = false; backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound)
                                 })
                             }
-                            AppMenuItem(text = { Text("Check for updates") }, onClick = {
+                            AppMenuItem(text = { Text(t("Check for updates")) }, onClick = {
                                 moreMenu = false
                                 scope.launch {
                                     try {
                                         val found = Updates.check(context, force = true)
                                         if (found != null) dialog = HomeDialog.Update(found)
-                                        else notify("You have the latest version.")
+                                        else notify(t("You have the latest version."))
                                     } catch (e: Exception) {
                                         AppLog.e("update", "Check failed: ${e.message}")
-                                        notify("Couldn't check for updates.")
+                                        notify(t("Couldn't check for updates."))
                                     }
                                 }
                             })
@@ -768,27 +775,27 @@ private fun HomeScreen(
                     }
                     if (!LocalIsTv.current) {
                         GlassButton(onClick = { searchOpen = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search channels", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
+                            Icon(Icons.Default.Search, contentDescription = t("Search channels"), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
                         }
                     }
                     if (!LocalIsTv.current) {
                         // List or grid: the icon shows the view a tap switches to
                         IconButton(onClick = { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
-                            if (phoneGrid) Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Show as list", tint = Amber)
-                            else Icon(Icons.Default.GridView, contentDescription = "Show as grid", tint = Amber)
+                            if (phoneGrid) Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = t("Show as list"), tint = Amber)
+                            else Icon(Icons.Default.GridView, contentDescription = t("Show as grid"), tint = Amber)
                         }
                     }
                     // On a phone, adding channels is the floating "Add playlist" button at the bottom
                     if (LocalIsTv.current) {
                         Box {
                             IconButton(onClick = { dialog = HomeDialog.AddPlaylist() }, modifier = Modifier.tvFocusRing()) {
-                                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add channels")
+                                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = t("Add channels"))
                             }
                         }
                     }
                     if (LocalIsTv.current) Box {
                         IconButton(onClick = { moreMenu = true }, modifier = Modifier.tvFocusRing()) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            Icon(Icons.Default.MoreVert, contentDescription = t("More options"))
                         }
                         // On a TV the remote moves through a menu next to the button; on a phone the long list slides up
                         // from the bottom instead, so it never covers the top of the app
@@ -900,7 +907,7 @@ private fun HomeScreen(
                     },
                 ) else if (!isTv) TopAppBar(
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = "Menu") }
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = t("Menu")) }
                     },
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -938,7 +945,7 @@ private fun HomeScreen(
                         onClick = { dialog = HomeDialog.AddPlaylist() },
                         containerColor = Amber,
                         contentColor = FocusInk,
-                    ) { Icon(Icons.Default.Add, contentDescription = "Add playlist") }
+                    ) { Icon(Icons.Default.Add, contentDescription = t("Add playlist")) }
                 }
             },
         ) { padding ->
@@ -958,6 +965,7 @@ private fun HomeScreen(
             }
             // On a phone, the channels follow your finger as you drag left or right; when you let go, the next or previous tab opens
             val dragX = remember { Animatable(0f) }
+        val rtlNow = rememberUpdatedState(LocalLayoutDirection.current == LayoutDirection.Rtl)
             var paneWidth by remember { mutableFloatStateOf(1f) }
             val swipeToTab = if (isTv) Modifier else Modifier
                 .onSizeChanged { paneWidth = it.width.toFloat().coerceAtLeast(1f) }
@@ -968,18 +976,21 @@ private fun HomeScreen(
                             scope.launch {
                                 val last = phoneTabs.lastIndex
                                 val at = phoneTabs.indexOf(section)   // -1 on My playlists: no swiping there
+                                // In Hebrew the tabs run right to left, so the finger's direction is mirrored
+                                val fwd = if (rtlNow.value) -1f else 1f
+                                val moved = dragX.value * fwd
                                 val dir = when {
                                     at < 0 -> 0
-                                    dragX.value <= -paneWidth * 0.2f && at < last -> 1    // finger moved left: the next tab
-                                    dragX.value >= paneWidth * 0.2f && at > 0 -> -1
+                                    moved <= -paneWidth * 0.2f && at < last -> 1    // finger moved towards the next tab
+                                    moved >= paneWidth * 0.2f && at > 0 -> -1
                                     else -> 0
                                 }
                                 if (dir == 0) {
                                     dragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                                 } else {
-                                    dragX.animateTo(-dir * paneWidth, tween(140))        // the old tab slides out…
+                                    dragX.animateTo(-dir * paneWidth * fwd, tween(140))        // the old tab slides out…
                                     section = phoneTabs[at + dir]
-                                    dragX.snapTo(dir * paneWidth)
+                                    dragX.snapTo(dir * paneWidth * fwd)
                                     dragX.animateTo(0f, tween(200))                      // …and the new one slides in
                                 }
                             }
@@ -988,7 +999,8 @@ private fun HomeScreen(
                     ) { change, dragAmount ->
                         change.consume()
                         // A little resistance past the first or last tab
-                        val atEdge = phoneTabs.indexOf(section).let { at -> at < 0 || (dragAmount > 0 && at == 0) || (dragAmount < 0 && at == phoneTabs.lastIndex) }
+                        val d = if (rtlNow.value) -dragAmount else dragAmount
+                        val atEdge = phoneTabs.indexOf(section).let { at -> at < 0 || (d > 0 && at == 0) || (d < 0 && at == phoneTabs.lastIndex) }
                         scope.launch { dragX.snapTo(dragX.value + if (atEdge) dragAmount * 0.3f else dragAmount) }
                     }
                 }
@@ -1011,7 +1023,7 @@ private fun HomeScreen(
                             modifier = Modifier.weight(1f),
                             requesters = tabRequesters,
                         )
-                        IconButton(onClick = { dialog = HomeDialog.Search }, modifier = Modifier.tvFocusRing()) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
+                        IconButton(onClick = { dialog = HomeDialog.Search }, modifier = Modifier.tvFocusRing()) { Icon(Icons.Default.Search, contentDescription = t("Search channels")) }
                         topActions()
                     }
                 }
@@ -1030,17 +1042,17 @@ private fun HomeScreen(
                             onValueChange = { url = it },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
-                            placeholder = { Text("Stream or playlist link") },
+                            placeholder = { Text(t("Stream or playlist link")) },
                             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                             keyboardActions = KeyboardActions(onGo = { submitUrl() }),
                             trailingIcon = if (url.isNotEmpty()) {
-                                { IconButton(onClick = { url = "" }) { Icon(Icons.Default.Close, contentDescription = "Clear") } }
+                                { IconButton(onClick = { url = "" }) { Icon(Icons.Default.Close, contentDescription = t("Clear")) } }
                             } else null,
                         )
                         FilledIconButton(onClick = ::submitUrl, enabled = !checkingLink, modifier = Modifier.size(52.dp)) {
                             if (checkingLink) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Default.PlayArrow, contentDescription = "Open")
+                            else Icon(Icons.Default.PlayArrow, contentDescription = t("Open"))
                         }
                     }
                     FormatPicker(format, onPick = { format = it }, modifier = Modifier.padding(horizontal = 8.dp))
@@ -1049,8 +1061,8 @@ private fun HomeScreen(
                 if (!isTv && section == Section.Playlists) {
                     // ☰ → My playlists: a title with a way back to the channels instead of the tabs
                     Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { section = Section.Sport }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to the channels") }
-                        Text("My playlists", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        IconButton(onClick = { section = Section.Sport }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back to the channels")) }
+                        Text(t("My playlists"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 } else if (!isTv) {
@@ -1059,7 +1071,7 @@ private fun HomeScreen(
                         Text(section.label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            if (visible.size == 1) "1 channel" else "%,d channels".format(visible.size),
+                            channelsCount(visible.size),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 2.dp),
@@ -1087,7 +1099,7 @@ private fun HomeScreen(
                         onSendLogin = if (isTv) null else { source -> dialog = HomeDialog.PickTv(TvJob.Login(source)) },
                         onShareQr = if (isTv) null else { source -> dialog = HomeDialog.ShareQr(source) },
                     onSelect = { selectAccount(it) },
-                        onCopy = { clipboard.setText(AnnotatedString(it.url)); notify("Link copied.") },
+                        onCopy = { clipboard.setText(AnnotatedString(it.url)); notify(t("Link copied.")) },
                         onRemove = { dialog = HomeDialog.RemovePlaylist(it) },
                         modifier = Modifier.weight(1f),
                     )
@@ -1119,7 +1131,7 @@ private fun HomeScreen(
                                 selected = true,
                                 onClick = { query = "" },
                                 label = { Text("Search: $query", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp)) },
-                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(16.dp)) },
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = t("Clear search"), modifier = Modifier.size(16.dp)) },
                             )
                         }
                         if (showSourceChip) item {
@@ -1187,7 +1199,7 @@ private fun HomeScreen(
                                 onToggleFavorite = { store.toggleFavorite(ch) },
                                 onRename = { dialog = HomeDialog.Rename(ch) },
                                 onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
-                                onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
+                                onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify(t("Link copied.")) },
                                 onRemove = { store.remove(ch.url) },
                                 removeLabel = "Delete channel",
                                 onAir = NowNext.of(guides[ch.url], nowSeconds),
@@ -1222,17 +1234,17 @@ private fun HomeScreen(
                                 },
                                 onToggleFavorite = { store.toggleFavorite(ch) },
                                 menuItems = { close ->
-                                    if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { close(); dialog = HomeDialog.Rename(ch) })
-                                    else AppMenuItem(text = { Text("Save to channels") }, onClick = { close(); store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") })
-                                    if (guideLogin != null) AppMenuItem(text = { Text("TV guide") }, onClick = { close(); dialog = HomeDialog.Guide(ch, guideLogin) })
-                                    AppMenuItem(text = { Text("Play on TV") }, onClick = {
+                                    if (saved) AppMenuItem(text = { Text(t("Rename")) }, onClick = { close(); dialog = HomeDialog.Rename(ch) })
+                                    else AppMenuItem(text = { Text(t("Save to channels")) }, onClick = { close(); store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") })
+                                    if (guideLogin != null) AppMenuItem(text = { Text(t("TV guide")) }, onClick = { close(); dialog = HomeDialog.Guide(ch, guideLogin) })
+                                    AppMenuItem(text = { Text(t("Play on TV")) }, onClick = {
                                         close()
                                         val from = (i - 100).coerceAtLeast(0)
                                         val to = (i + 100).coerceAtMost(visible.size)
                                         dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
                                     })
-                                    AppMenuItem(text = { Text("Copy link") }, onClick = { close(); clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") })
-                                    AppMenuItem(text = { Text("Delete channel") }, onClick = {
+                                    AppMenuItem(text = { Text(t("Copy link")) }, onClick = { close(); clipboard.setText(AnnotatedString(ch.url)); notify(t("Link copied.")) })
+                                    AppMenuItem(text = { Text(t("Delete channel")) }, onClick = {
                                         close()
                                         store.remove(ch.url)
                                     })
@@ -1259,7 +1271,7 @@ private fun HomeScreen(
                                 onToggleFavorite = { store.toggleFavorite(ch) },
                                 onRename = { dialog = HomeDialog.Rename(ch) },
                                 onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
-                                onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
+                                onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify(t("Link copied.")) },
                                 onPlayOnTv = if (isTv) null else {
                                     {
                                         val from = (i - 100).coerceAtLeast(0)
@@ -1293,58 +1305,58 @@ private fun HomeScreen(
                 if (drawerState.currentValue == DrawerValue.Open || drawerState.targetValue == DrawerValue.Open) DrawerColumn(
                     version = appVersion,
                     account = mainAccount?.name,
-                    accountDetail = mainAccount?.let { "%,d channels".format(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · updated " + updatedAgo(it.updatedAt) else "" },
+                    accountDetail = mainAccount?.let { channelsCount(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · " + t("updated") + " " + updatedAgo(it.updatedAt) else "" },
                     onAccount = { closeDrawer(); if (sources.size > 1) dialog = HomeDialog.PickAccount else section = Section.Playlists },
                 ) {
                     fun go(s: Section) { closeDrawer(); section = s; sourceFilter = null; group = null }
-                    DrawerSection("Channels", divider = false)
-                    DrawerRow(Icons.Default.LiveTv, "All channels", { go(Section.All) }, section == Section.All) { DrawerCount(channels.size) }
-                    DrawerRow(Icons.Default.SportsSoccer, "Sport", { go(Section.Sport) }, section == Section.Sport) { DrawerCount(sportPicked.size) }
-                    DrawerRow(Icons.Default.Tv, "Israeli TV", { go(Section.Israel) }, section == Section.Israel) { DrawerCount(israelPicked.size) }
-                    DrawerRow(Icons.Default.Star, "Favorites", { go(Section.Favorites) }, section == Section.Favorites) { DrawerCount(channels.count { it.favorite }) }
-                    DrawerRow(Icons.AutoMirrored.Filled.PlaylistPlay, "My playlists", { go(Section.Playlists) }, section == Section.Playlists)
+                    DrawerSection(t("Channels"), divider = false)
+                    DrawerRow(Icons.Default.LiveTv, t("All channels"), { go(Section.All) }, section == Section.All) { DrawerCount(channels.size) }
+                    DrawerRow(Icons.Default.SportsSoccer, t("Sport"), { go(Section.Sport) }, section == Section.Sport) { DrawerCount(sportPicked.size) }
+                    DrawerRow(Icons.Default.Tv, t("Israeli TV"), { go(Section.Israel) }, section == Section.Israel) { DrawerCount(israelPicked.size) }
+                    DrawerRow(Icons.Default.Star, t("Favorites"), { go(Section.Favorites) }, section == Section.Favorites) { DrawerCount(channels.count { it.favorite }) }
+                    DrawerRow(Icons.AutoMirrored.Filled.PlaylistPlay, t("My playlists"), { go(Section.Playlists) }, section == Section.Playlists)
 
-                    DrawerSection("Account & sharing")
-                    DrawerRow(Icons.Default.Add, "Add playlist", { closeDrawer(); dialog = HomeDialog.AddPlaylist() })
-                    if (sources.isNotEmpty()) DrawerRow(Icons.Default.Refresh, "Update all playlists", { closeDrawer(); sources.forEach { loadPlaylist(it.url) } })
-                    DrawerRow(Icons.Default.QrCode2, "Share account with QR code", {
+                    DrawerSection(t("Account & sharing"))
+                    DrawerRow(Icons.Default.Add, t("Add playlist"), { closeDrawer(); dialog = HomeDialog.AddPlaylist() })
+                    if (sources.isNotEmpty()) DrawerRow(Icons.Default.Refresh, t("Update all playlists"), { closeDrawer(); sources.forEach { loadPlaylist(it.url) } })
+                    DrawerRow(Icons.Default.QrCode2, t("Share account with QR code"), {
                         closeDrawer()
                         when (xtreamSources.size) {
-                            0 -> notify("Sign in to an account first (+ Add playlist → Login).")
+                            0 -> notify(t("Sign in to an account first (+ Add playlist → Login)."))
                             1 -> dialog = HomeDialog.ShareQr(xtreamSources[0])
-                            else -> { section = Section.Playlists; notify("Tap ⋮ next to the account → Share with QR code.") }
+                            else -> { section = Section.Playlists; notify(t("Tap ⋮ next to the account → Share with QR code.")) }
                         }
                     })
-                    DrawerRow(Icons.Default.Cast, "Send login to TV", {
+                    DrawerRow(Icons.Default.Cast, t("Send login to TV"), {
                         closeDrawer()
                         when (xtreamSources.size) {
-                            0 -> notify("Sign in to an account first (+ Add playlist → Login).")
+                            0 -> notify(t("Sign in to an account first (+ Add playlist → Login)."))
                             1 -> dialog = HomeDialog.PickTv(TvJob.Login(xtreamSources[0]))
-                            else -> { section = Section.Playlists; notify("Tap ⋮ next to the account → Send login to TV.") }
+                            else -> { section = Section.Playlists; notify(t("Tap ⋮ next to the account → Send login to TV.")) }
                         }
                     })
-                    DrawerRow(Icons.Default.PhonelinkRing, "Continue from TV", { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.TakeOver) })
+                    DrawerRow(Icons.Default.PhonelinkRing, t("Continue from TV"), { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.TakeOver) })
 
-                    DrawerSection("Settings")
-                    DrawerRow(Icons.Default.Settings, "Settings", { closeDrawer(); dialog = HomeDialog.Settings })
+                    DrawerSection(t("Settings"))
+                    DrawerRow(Icons.Default.Settings, t("Settings"), { closeDrawer(); dialog = HomeDialog.Settings })
 
-                    DrawerSection("Help")
-                    DrawerRow(Icons.Default.SystemUpdate, "Check for updates", {
+                    DrawerSection(t("Help"))
+                    DrawerRow(Icons.Default.SystemUpdate, t("Check for updates"), {
                         closeDrawer()
                         scope.launch {
                             try {
                                 val found = Updates.check(context, force = true)
                                 if (found != null) dialog = HomeDialog.Update(found)
-                                else notify("You have the latest version.")
+                                else notify(t("You have the latest version."))
                             } catch (e: Exception) {
                                 AppLog.e("update", "Check failed: ${e.message}")
-                                notify("Couldn't check for updates.")
+                                notify(t("Couldn't check for updates."))
                             }
                         }
                     })
-                    DrawerRow(Icons.Default.BugReport, "Send problem report", { closeDrawer(); dialog = HomeDialog.Report(Problems.report(context)) })
-                    DrawerRow(Icons.Default.Tv, "Problems from TV", { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.Logs) })
-                    DrawerRow(Icons.Default.Info, "About", { closeDrawer(); dialog = HomeDialog.About })
+                    DrawerRow(Icons.Default.BugReport, t("Send problem report"), { closeDrawer(); dialog = HomeDialog.Report(Problems.report(context)) })
+                    DrawerRow(Icons.Default.Tv, t("Problems from TV"), { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.Logs) })
+                    DrawerRow(Icons.Default.Info, t("About"), { closeDrawer(); dialog = HomeDialog.About })
                 }
             }
         },
@@ -1376,52 +1388,57 @@ private fun HomeScreen(
                     store.removePlaylist(d.source.url)
                     if (sourceFilter == d.source.url) sourceFilter = null
                     dialog = null
-                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                }) { Text(t("Remove"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text(t("Cancel")) } },
         )
         HomeDialog.Settings -> SettingsScreen(version = appVersion, onDismiss = { dialog = null }) {
-                      DrawerSection("Look", divider = false)
-                      DrawerRow(Icons.Default.DarkMode, "Theme", {
+                      DrawerSection(t("Look"), divider = false)
+                      DrawerRow(Icons.Default.DarkMode, t("Theme"), {
                           ThemePrefs.set(context, ThemeMode.entries[(ThemePrefs.mode.ordinal + 1) % ThemeMode.entries.size])
                       }) {
-                          DrawerSegments(listOf("Phone", "Dark", "Light"), ThemePrefs.mode.ordinal) { ThemePrefs.set(context, ThemeMode.entries[it]) }
+                          DrawerSegments(listOf(t("Phone"), t("Dark"), t("Light")), ThemePrefs.mode.ordinal) { ThemePrefs.set(context, ThemeMode.entries[it]) }
                       }
-                      DrawerSection("Video")
-                      DrawerRow(Icons.Default.HighQuality, "Video quality", {
+                      DrawerRow(Icons.Default.Language, t("Language"), {
+                          Lang.set(context, LangMode.entries[(Lang.mode.ordinal + 1) % LangMode.entries.size])
+                      }) {
+                          DrawerSegments(listOf(t("Phone"), "עברית", "English"), Lang.mode.ordinal) { Lang.set(context, LangMode.entries[it]) }
+                      }
+                      DrawerSection(t("Video"))
+                      DrawerRow(Icons.Default.HighQuality, t("Video quality"), {
                           deviceQuality = if (deviceQuality == QualityCap.Best) QualityCap.FullHd else QualityCap.Best; DeviceQuality.set(context, deviceQuality)
                       }) {
                           DrawerSegments(listOf("Full HD", "4K"), if (deviceQuality == QualityCap.Best) 1 else 0) {
                               deviceQuality = if (it == 1) QualityCap.Best else QualityCap.FullHd; DeviceQuality.set(context, deviceQuality)
                           }
                       }
-                      DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {
+                      DrawerRow(Icons.Default.SignalCellularAlt, t("Lower quality on mobile data"), {
                           saveMobileData = !saveMobileData; DeviceQuality.setSaveData(context, saveMobileData)
                       }) { DrawerSwitch(saveMobileData) { saveMobileData = it; DeviceQuality.setSaveData(context, it) } }
-                      DrawerSection("Player")
-                      DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", { pipOnLeave = !pipOnLeave; PlayerPrefs.setPipOnLeave(context, pipOnLeave) }) {
+                      DrawerSection(t("Player"))
+                      DrawerRow(Icons.Default.PictureInPictureAlt, t("Small window when leaving"), { pipOnLeave = !pipOnLeave; PlayerPrefs.setPipOnLeave(context, pipOnLeave) }) {
                           DrawerSwitch(pipOnLeave) { pipOnLeave = it; PlayerPrefs.setPipOnLeave(context, it) }
                       }
-                      DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", { channelButtons = !channelButtons; PlayerPrefs.setChannelButtons(context, channelButtons) }) {
+                      DrawerRow(Icons.Default.UnfoldMore, t("CH + / − buttons on the picture"), { channelButtons = !channelButtons; PlayerPrefs.setChannelButtons(context, channelButtons) }) {
                           DrawerSwitch(channelButtons) { channelButtons = it; PlayerPrefs.setChannelButtons(context, it) }
                       }
-                      DrawerRow(Icons.AutoMirrored.Filled.VolumeUp, "Sound with screen off", { backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound) }) {
+                      DrawerRow(Icons.AutoMirrored.Filled.VolumeUp, t("Sound with screen off"), { backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound) }) {
                           DrawerSwitch(backgroundSound) { backgroundSound = it; BackgroundAudio.setEnabled(context, it) }
                       }
-                      DrawerSection("Home screen")
-                      DrawerRow(Icons.Default.GridView, "View", { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
-                          DrawerSegments(listOf("List", "Grid"), if (phoneGrid) 1 else 0) { phoneGrid = it == 1; PhoneView.setGrid(context, phoneGrid) }
+                      DrawerSection(t("Home screen"))
+                      DrawerRow(Icons.Default.GridView, t("View"), { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
+                          DrawerSegments(listOf(t("List"), t("Grid")), if (phoneGrid) 1 else 0) { phoneGrid = it == 1; PhoneView.setGrid(context, phoneGrid) }
                       }
-                      DrawerRow(Icons.Default.History, "Open on last channel", { openLast = !openLast; Resume.setEnabled(context, openLast) }) {
+                      DrawerRow(Icons.Default.History, t("Open on last channel"), { openLast = !openLast; Resume.setEnabled(context, openLast) }) {
                           DrawerSwitch(openLast) { openLast = it; Resume.setEnabled(context, it) }
                       }
-                      if (sources.isNotEmpty()) DrawerSection("Links")
-                      if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) "Hide the link bar" else "Open a stream link", { dialog = null; linkBarOpen = !linkBarOpen })
+                      if (sources.isNotEmpty()) DrawerSection(t("Links"))
+                      if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) t("Hide the link bar") else t("Open a stream link"), { dialog = null; linkBarOpen = !linkBarOpen })
 
         }
         HomeDialog.PickAccount -> AlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Choose the account") },
+            title = { Text(t("Choose the account")) },
             text = {
                 Column {
                     sources.forEach { s ->
@@ -1433,7 +1450,7 @@ private fun HomeScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (s.enabled) FontWeight.SemiBold else FontWeight.Normal)
                                 Text(
-                                    "%,d channels".format(s.channelCount) + (s.xtream?.let { " · ${it.username}" } ?: ""),
+                                    channelsCount(s.channelCount) + (s.xtream?.let { " · ${it.username}" } ?: ""),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1441,15 +1458,15 @@ private fun HomeScreen(
                         }
                     }
                     Text(
-                        "The others stay saved, just turned off.",
+                        t("The others stay saved, just turned off."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { dialog = null; section = Section.Playlists }) { Text("Manage playlists") } },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { dialog = null; section = Section.Playlists }) { Text(t("Manage playlists")) } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text(t("Cancel")) } },
         )
         HomeDialog.About -> AlertDialog(
             onDismissRequest = { dialog = null },
@@ -1457,18 +1474,17 @@ private fun HomeScreen(
             title = { BrandName(style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Text(
-                    "Version ${runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()}\n\n" +
-                        "Live TV from your IPTV account on the phone, the TV and the PC: Sport and Israeli TV lists, the TV guide, " +
-                        "favorites, and sharing an account with a QR code.",
+                    "${t("Version")} ${runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()}\n\n" +
+                        t("Live TV from your IPTV account on the phone, the TV and the PC: Sport and Israeli TV lists, the TV guide, favorites, and sharing an account with a QR code."),
                 )
             },
-            confirmButton = { TextButton(onClick = { dialog = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text(t("OK")) } },
         )
         is HomeDialog.ShareQr -> ShareLoginDialog(d.source, onDismiss = { dialog = null }, onDone = { notify(it) })
         is HomeDialog.SharedLogin -> AddSharedLoginDialog(
             login = d.login,
             name = d.name,
-            onAdd = { dialog = null; addLogin(d.login, d.name); notify("Account added. Loading the channels…") },
+            onAdd = { dialog = null; addLogin(d.login, d.name); notify(t("Account added. Loading the channels…")) },
             onDismiss = { dialog = null },
         )
         is HomeDialog.AddPlaylist -> AddPlaylistDialog(
@@ -1501,7 +1517,7 @@ private fun HomeScreen(
         )
         is HomeDialog.Crash -> AlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Livio stopped unexpectedly") },
+            title = { Text(t("Livio stopped unexpectedly")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sorry about that. Copy these details and send them to whoever builds the app so it can be fixed. Passwords are removed.")
@@ -1514,9 +1530,9 @@ private fun HomeScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(d.report)); dialog = null; notify("Details copied.") }) { Text("Copy details") }
+                TextButton(onClick = { clipboard.setText(AnnotatedString(d.report)); dialog = null; notify(t("Details copied.")) }) { Text(t("Copy details")) }
             },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text(t("Close")) } },
         )
         HomeDialog.LinkPhone -> LinkPhoneDialog(onDismiss = { dialog = null })
         is HomeDialog.Invite -> {
@@ -1537,7 +1553,7 @@ private fun HomeScreen(
             onConfirm = { query = it.trim(); dialog = null },
         )
         is HomeDialog.PickTv -> TvPickerDialog(
-            title = when (d.job) { is TvJob.Login -> "Send login to TV"; TvJob.TakeOver -> "Continue from TV"; TvJob.Logs -> "Problems from TV"; else -> "Play on TV" },
+            title = when (d.job) { is TvJob.Login -> t("Send login to TV"); TvJob.TakeOver -> t("Continue from TV"); TvJob.Logs -> t("Problems from TV"); else -> t("Play on TV") },
             onDismiss = { dialog = null },
             onChosen = { device, code -> dialog = null; runTvJob(d.job, device, code) },
         )
@@ -1549,7 +1565,7 @@ private fun HomeScreen(
         is HomeDialog.Update -> UpdateDialog(d.info, onDismiss = { dialog = null })
         is HomeDialog.Report -> AlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text("Problem report") },
+            title = { Text(t("Problem report")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Send it to yourself (WhatsApp, email…) and paste it to whoever fixes the app. Passwords are hidden.")
@@ -1562,10 +1578,10 @@ private fun HomeScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { Problems.markSeen(context); dialog = null; Problems.share(context, d.text) }) { Text("Send") }
+                TextButton(onClick = { Problems.markSeen(context); dialog = null; Problems.share(context, d.text) }) { Text(t("Send")) }
             },
             dismissButton = {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); Problems.markSeen(context); dialog = null; notify("Report copied.") }) { Text("Copy") }
+                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); Problems.markSeen(context); dialog = null; notify(t("Report copied.")) }) { Text(t("Copy")) }
             },
         )
         is HomeDialog.TvLogs -> AlertDialog(
@@ -1580,10 +1596,10 @@ private fun HomeScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { dialog = null; Problems.share(context, d.text) }) { Text("Send") }
+                TextButton(onClick = { dialog = null; Problems.share(context, d.text) }) { Text(t("Send")) }
             },
             dismissButton = {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); dialog = null; notify("TV report copied. Passwords are hidden.") }) { Text("Copy") }
+                TextButton(onClick = { clipboard.setText(AnnotatedString(d.text)); dialog = null; notify("TV report copied. Passwords are hidden.") }) { Text(t("Copy")) }
             },
         )
         is HomeDialog.Guide -> ChannelGuideDialog(d.channel, d.login, onPlay = { dialog = null; playSport(d.channel) }, onDismiss = { dialog = null })
@@ -1605,7 +1621,7 @@ private fun HomeScreen(
                     MonoLine(d.link)
                 }
             },
-            confirmButton = { TextButton(onClick = { dialog = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text(t("OK")) } },
             dismissButton = {
                 TextButton(onClick = { dialog = null; playLink(d.link) }) { Text("Try as a stream") }
             },
@@ -1638,7 +1654,7 @@ private fun PlaylistsPane(
             Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Add channels")
+                Text(t("Add channels"))
             }
         }
         if (sources.isEmpty() && pending.isEmpty()) item {
@@ -1676,7 +1692,7 @@ private fun PlaylistsPane(
                 } else null,
                 headlineContent = {
                     Text(
-                        if (s.enabled) s.name else "${s.name} (off)",
+                        if (s.enabled) s.name else "${s.name} ${t("(off)")}",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = if (s.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1690,8 +1706,8 @@ private fun PlaylistsPane(
                         Text(
                             if (s.url in loading) progress[s.url].orEmpty()
                             else if (s.updatedAt == 0L) (if (s.xtream != null) "${s.xtream.username} · not loaded yet" else "Not loaded yet")
-                            else if (s.xtream != null) "Signed in as ${s.xtream.username} · updated ${updatedAgo(s.updatedAt)}"
-                            else "${s.channelCount} channels · updated ${updatedAgo(s.updatedAt)}",
+                            else if (s.xtream != null) "${t("Signed in as")} ${s.xtream.username} · ${t("updated")} ${updatedAgo(s.updatedAt)}"
+                            else "${channelsCount(s.channelCount)} · ${t("updated")} ${updatedAgo(s.updatedAt)}",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         MonoLine(s.xtream?.base ?: s.url)
@@ -1705,23 +1721,23 @@ private fun PlaylistsPane(
                         if (s.url in loading) {
                             CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
                         } else {
-                            IconButton(onClick = { onRefresh(s) }) { Icon(Icons.Default.Refresh, contentDescription = "Update playlist") }
+                            IconButton(onClick = { onRefresh(s) }) { Icon(Icons.Default.Refresh, contentDescription = t("Update playlist")) }
                         }
                         Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Playlist options") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = t("Playlist options")) }
                             DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                                AppMenuItem(text = { Text("Show channels") }, onClick = { menu = false; onShow(s) })
-                                AppMenuItem(text = { Text(if (s.xtream != null) "Edit login" else "Rename") }, onClick = { menu = false; onRename(s) })
-                                AppMenuItem(text = { Text(if (s.enabled) "Turn off" else "Turn on") }, onClick = { menu = false; onToggle(s) })
+                                AppMenuItem(text = { Text(t("Show channels")) }, onClick = { menu = false; onShow(s) })
+                                AppMenuItem(text = { Text(if (s.xtream != null) t("Edit login") else t("Rename")) }, onClick = { menu = false; onRename(s) })
+                                AppMenuItem(text = { Text(if (s.enabled) t("Turn off") else t("Turn on")) }, onClick = { menu = false; onToggle(s) })
                                 if (onSendLogin != null && s.xtream != null) {
-                                    AppMenuItem(text = { Text("Send login to TV") }, onClick = { menu = false; onSendLogin(s) })
+                                    AppMenuItem(text = { Text(t("Send login to TV")) }, onClick = { menu = false; onSendLogin(s) })
                                 }
                                 if (onShareQr != null && s.xtream != null) {
-                                    AppMenuItem(text = { Text("Share with QR code") }, onClick = { menu = false; onShareQr(s) })
+                                    AppMenuItem(text = { Text(t("Share with QR code")) }, onClick = { menu = false; onShareQr(s) })
                                 }
-                                AppMenuItem(text = { Text("Show logs") }, onClick = { menu = false; onLogs() })
-                                AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy(s) })
-                                AppMenuItem(text = { Text("Remove playlist") }, onClick = { menu = false; onRemove(s) })
+                                AppMenuItem(text = { Text(t("Show logs")) }, onClick = { menu = false; onLogs() })
+                                AppMenuItem(text = { Text(t("Copy link")) }, onClick = { menu = false; onCopy(s) })
+                                AppMenuItem(text = { Text(t("Remove playlist")) }, onClick = { menu = false; onRemove(s) })
                             }
                         }
                     }
@@ -1769,11 +1785,11 @@ private fun AddPlaylistDialog(linkFirst: Boolean, onPickQr: () -> Unit, onImport
     val loginInLink = normalized?.let { if (XtreamLogin.isLoginLink(it)) XtreamLogin.fromLink(it) else null }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add channels") },
+        title = { Text(t("Add channels")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf("Login", "Link", "QR code").forEachIndexed { i, label ->
+                    listOf(t("Login"), t("Link"), t("QR code")).forEachIndexed { i, label ->
                         SegmentedButton(selected = mode == i, onClick = { mode = i }, shape = SegmentedButtonDefaults.itemShape(i, 3), icon = {}) {
                             Text(label, maxLines = 1)
                         }
@@ -1802,7 +1818,7 @@ private fun AddPlaylistDialog(linkFirst: Boolean, onPickQr: () -> Unit, onImport
                     OutlinedTextField(
                         value = link,
                         onValueChange = { link = it },
-                        label = { Text("Playlist link") },
+                        label = { Text(t("Playlist link")) },
                         placeholder = { Text("server.com:8080/playlist.m3u") },
                         singleLine = true,
                         isError = link.isNotBlank() && normalized == null,
@@ -1819,29 +1835,29 @@ private fun AddPlaylistDialog(linkFirst: Boolean, onPickQr: () -> Unit, onImport
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Name (optional)") },
+                            label = { Text(t("Name (optional)")) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     // The rarer ways, for a list saved as a file or copied as text
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Or:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = onImportFile) { Text("Open a .m3u file") }
-                        TextButton(onClick = onPasteText) { Text("Paste text") }
+                        Text(t("Or:"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = onImportFile) { Text(t("Open a .m3u file")) }
+                        TextButton(onClick = onPasteText) { Text(t("Paste text")) }
                     }
                 }
             }
         },
         confirmButton = {
             when {
-                mode == 2 -> TextButton(onClick = onPickQr) { Text("Pick the picture") }
-                !useLink -> TextButton(onClick = { onSignIn(null) }) { Text("Continue") }
-                loginInLink != null -> TextButton(onClick = { onSignIn(loginInLink) }) { Text("Sign in") }
-                else -> TextButton(onClick = { onConfirm(normalized!!, name.trim()) }, enabled = normalized != null) { Text("Add") }
+                mode == 2 -> TextButton(onClick = onPickQr) { Text(t("Pick the picture")) }
+                !useLink -> TextButton(onClick = { onSignIn(null) }) { Text(t("Continue")) }
+                loginInLink != null -> TextButton(onClick = { onSignIn(loginInLink) }) { Text(t("Sign in")) }
+                else -> TextButton(onClick = { onConfirm(normalized!!, name.trim()) }, enabled = normalized != null) { Text(t("Add")) }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } },
     )
 }
 
@@ -1924,17 +1940,17 @@ private fun ChannelRow(
         trailingContent = {
             Row {
                 IconButton(onClick = onToggleFavorite) {
-                    if (channel.favorite) Icon(Icons.Default.Star, contentDescription = "Remove from favorites", tint = if (lit) FocusAmberDark else Amber)
-                    else Icon(Icons.Outlined.StarBorder, contentDescription = "Add to favorites")
+                    if (channel.favorite) Icon(Icons.Default.Star, contentDescription = t("Remove from favorites"), tint = if (lit) FocusAmberDark else Amber)
+                    else Icon(Icons.Outlined.StarBorder, contentDescription = t("Add to favorites"))
                 }
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Channel options") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = t("Channel options")) }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                        if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { menu = false; onRename() })
-                        else AppMenuItem(text = { Text("Save to channels") }, onClick = { menu = false; onSave() })
-                        if (onGuide != null) AppMenuItem(text = { Text("TV guide") }, onClick = { menu = false; onGuide() })
-                        if (onPlayOnTv != null) AppMenuItem(text = { Text("Play on TV") }, onClick = { menu = false; onPlayOnTv() })
-                        AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy() })
+                        if (saved) AppMenuItem(text = { Text(t("Rename")) }, onClick = { menu = false; onRename() })
+                        else AppMenuItem(text = { Text(t("Save to channels")) }, onClick = { menu = false; onSave() })
+                        if (onGuide != null) AppMenuItem(text = { Text(t("TV guide")) }, onClick = { menu = false; onGuide() })
+                        if (onPlayOnTv != null) AppMenuItem(text = { Text(t("Play on TV")) }, onClick = { menu = false; onPlayOnTv() })
+                        AppMenuItem(text = { Text(t("Copy link")) }, onClick = { menu = false; onCopy() })
                         AppMenuItem(text = { Text(removeLabel) }, onClick = { menu = false; onRemove() })
                     }
                 }
@@ -1978,12 +1994,12 @@ private fun ChannelBadge(channel: Channel, number: Int?) {
 @Composable
 private fun EmptyState(section: Section, filtered: Boolean) {
     val text = when {
-        filtered -> "No channels match your search."
-        section == Section.Favorites -> "No favorites yet. Tap the star next to a channel to pin it here."
-        section == Section.Israel -> "No Israeli channels found. They show up here once your account has Channel 11, 12, 13, 14 or 15."
-        section == Section.Sport -> "No sport channels found. They show up here once your account has Sport 1–6, Sport 5 or ONE."
+        filtered -> t("No channels match your search.")
+        section == Section.Favorites -> t("No favorites yet. Tap the star next to a channel to pin it here.")
+        section == Section.Israel -> t("No Israeli channels found. They show up here once your account has Channel 11, 12, 13, 14 or 15.")
+        section == Section.Sport -> t("No sport channels found. They show up here once your account has Sport 1–6, Sport 5 or ONE.")
         section == Section.Playlists -> ""
-        else -> "No channels yet. Paste a stream link above, or import an M3U playlist with the + button."
+        else -> t("No channels yet. Paste a stream link above, or import an M3U playlist with the + button.")
     }
     Text(
         text,
@@ -2018,7 +2034,7 @@ private fun TextDialog(
             )
         },
         confirmButton = { TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } },
     )
 }
 
@@ -2095,12 +2111,12 @@ private fun LoginEditor(
             topBar = {
                 TopAppBar(
                     navigationIcon = {
-                        IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                        IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back")) }
                     },
                     title = { Text(if (source == null) "New login" else "Editing") },
                     actions = {
                         IconButton(onClick = ::save, enabled = valid) {
-                            Icon(Icons.Default.Check, contentDescription = "Save", tint = if (valid) Amber else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.Check, contentDescription = t("Save"), tint = if (valid) Amber else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
                 )
@@ -2111,7 +2127,7 @@ private fun LoginEditor(
                     onClick = ::save,
                     enabled = valid,
                     modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
-                ) { Text(if (source == null) "Sign in" else "Save") }
+                ) { Text(if (source == null) t("Sign in") else t("Save")) }
             },
         ) { padding ->
             Column(
@@ -2289,7 +2305,7 @@ private fun SeriesDialog(series: Channel, onDismiss: () -> Unit, onPlay: (List<C
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(t("Close")) } },
     )
 }
 
@@ -2310,12 +2326,12 @@ private fun LogsScreen(onDismiss: () -> Unit, onCopy: (String) -> Unit) {
             topBar = {
                 TopAppBar(
                     navigationIcon = {
-                        IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                        IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back")) }
                     },
                     title = { Text("Logs") },
                     actions = {
-                        TextButton(onClick = { onCopy(AppLog.text()) }, enabled = lines.isNotEmpty()) { Text("Copy") }
-                        TextButton(onClick = { confirmClear = true }, enabled = lines.isNotEmpty()) { Text("Clear") }
+                        TextButton(onClick = { onCopy(AppLog.text()) }, enabled = lines.isNotEmpty()) { Text(t("Copy")) }
+                        TextButton(onClick = { confirmClear = true }, enabled = lines.isNotEmpty()) { Text(t("Clear")) }
                     },
                 )
             },
@@ -2352,8 +2368,8 @@ private fun LogsScreen(onDismiss: () -> Unit, onCopy: (String) -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("Clear the logs?") },
-            confirmButton = { TextButton(onClick = { AppLog.clear(); confirmClear = false }) { Text("Clear") } },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { AppLog.clear(); confirmClear = false }) { Text(t("Clear")) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(t("Cancel")) } },
         )
     }
 }
@@ -2386,11 +2402,11 @@ private fun SportListEditor(initial: SportSettings, onDismiss: () -> Unit, onSav
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(SportSettings(text, cap)) }) { Text("Save") } },
+        confirmButton = { TextButton(onClick = { onSave(SportSettings(text, cap)) }) { Text(t("Save")) } },
         dismissButton = {
             Row {
-                TextButton(onClick = { text = SportList.DEFAULT_TEXT; cap = QualityCap.Best }) { Text("Reset") }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = { text = SportList.DEFAULT_TEXT; cap = QualityCap.Best }) { Text(t("Reset")) }
+                TextButton(onClick = onDismiss) { Text(t("Cancel")) }
             }
         },
     )
@@ -2398,7 +2414,7 @@ private fun SportListEditor(initial: SportSettings, onDismiss: () -> Unit, onSav
 
 /** "just now", "5 minutes ago", "yesterday": when a playlist was last updated. */
 private fun updatedAgo(at: Long): String =
-    if (System.currentTimeMillis() - at < 60_000) "just now"
+    if (System.currentTimeMillis() - at < 60_000) t("just now")
     else DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
 
 /** The bottom bar's icon for each tab. */

@@ -93,7 +93,9 @@ fun StreamDeskTheme(isTv: Boolean = false, alwaysDark: Boolean = false, content:
     // A TV is read from the sofa: scale everything up, and show the remote's selection
     val base = LocalDensity.current
     val density = if (isTv) Density(base.density * 1.3f, base.fontScale) else base
-    CompositionLocalProvider(LocalIsTv provides isTv, LocalDensity provides density) {
+    // Hebrew reads right to left: the whole screen mirrors (the player keeps its controls as they are)
+    val direction = if (Lang.hebrew && !alwaysDark) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
+    CompositionLocalProvider(LocalIsTv provides isTv, LocalDensity provides density, androidx.compose.ui.platform.LocalLayoutDirection provides direction) {
         val dark = alwaysDark || isAppDark(isTv)
         MaterialTheme(colorScheme = if (isTv) DeskColors.copy(onSurfaceVariant = Color(0xFFC4CDD2)) else if (dark) DeskColors else LightColors) {
             if (isTv) CompositionLocalProvider(LocalIndication provides TvFocusIndication, content = content) else content()

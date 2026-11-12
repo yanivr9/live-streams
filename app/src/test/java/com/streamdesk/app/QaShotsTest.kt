@@ -26,6 +26,7 @@ abstract class QaShotsBase {
     @get:Rule val compose = createEmptyComposeRule()
     abstract val tag: String
     open val theme: ThemeMode = ThemeMode.Dark
+    open val lang: LangMode = LangMode.English
 
     @Test
     fun screens() {
@@ -35,6 +36,7 @@ abstract class QaShotsBase {
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_TOUCHSCREEN, true)
         seedChannels(context)
         ThemePrefs.set(context, theme)
+        Lang.set(context, lang)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.mainClock.autoAdvance = false
             fun shot(name: String) {
@@ -49,14 +51,15 @@ abstract class QaShotsBase {
             }
             PhoneView.setGrid(context, false)
             shot("1-list")
-            compose.onNodeWithContentDescription("Show as grid").performClick(); shot("2-grid")
-            compose.tab("Israeli TV").performClick(); shot("3-israeli-grid")
-            compose.onNodeWithContentDescription("Search channels").performClick(); shot("4-search-open")
+            compose.onNodeWithContentDescription(t("Show as grid")).performClick(); shot("2-grid")
+            compose.tab(t("Israeli TV")).performClick(); shot("3-israeli-grid")
+            compose.onNodeWithContentDescription(t("Search channels")).performClick(); shot("4-search-open")
             compose.onNode(hasSetTextAction()).performTextInput("Channel 1"); shot("5-search-typed")
-            compose.onNodeWithContentDescription("Close search").performClick(); shot("6-search-closed")
-            compose.onNodeWithContentDescription("Menu").performClick(); shot("7-menu")
+            compose.onNodeWithContentDescription(t("Close search")).performClick(); shot("6-search-closed")
+            compose.onNodeWithContentDescription(t("Menu")).performClick(); shot("7-menu")
             PhoneView.setGrid(context, false)
         }
+        Lang.set(context, LangMode.English)
     }
 }
 
@@ -79,3 +82,7 @@ class QaShotsTablet : QaShotsBase() { override val tag = "tablet" }
 @RunWith(AndroidJUnit4::class) @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class QaShotsPhoneLight : QaShotsBase() { override val tag = "light"; override val theme = ThemeMode.Light }
+
+@RunWith(AndroidJUnit4::class) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
+class QaShotsPhoneHebrew : QaShotsBase() { override val tag = "hebrew"; override val lang = LangMode.Hebrew }

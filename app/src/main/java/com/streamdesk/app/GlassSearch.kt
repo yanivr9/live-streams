@@ -77,7 +77,7 @@ fun GlassSearchField(
         Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text("Search channels", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (value.isEmpty()) Text(t("Search channels"), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -93,7 +93,7 @@ fun GlassSearchField(
             Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)).clickable(role = Role.Button, onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Close, contentDescription = "Close search", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Close, contentDescription = t("Close search"), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
         }
     }
 }
