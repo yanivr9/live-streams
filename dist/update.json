@@ -1,6 +1,6 @@
 {
-  "versionCode": 95,
-  "versionName": "3.74",
+  "versionCode": 96,
+  "versionName": "3.75",
   "apk": "StreamDesk.apk",
-  "notes": "Bug fixes: TV guide on https-saved accounts, 3 grid cards on small phones, settings lines, 'updated just now'"
+  "notes": "Choose the active account: Playlists tab selector, or tap the account card in the ☰ menu"
 }
