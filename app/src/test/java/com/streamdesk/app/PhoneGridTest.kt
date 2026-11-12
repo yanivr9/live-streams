@@ -88,10 +88,8 @@ class PhoneGridTest {
             compose.onNodeWithContentDescription("More options").assertDoesNotExist()
             compose.onNodeWithContentDescription("Menu").performClick(); settle()
             compose.onNodeWithText("Share account with QR code").assertExists()
-            compose.onNodeWithText("Sound with screen off").assertExists()
-            compose.onNodeWithText("Video quality").assertExists()
-            compose.onNodeWithText("CH + / − buttons on the picture").assertExists()
-            compose.onNodeWithText("Small window when leaving").assertExists()
+            compose.onNodeWithText("Settings").assertExists()   // one entry: the settings are on their own screen
+            compose.onNodeWithText("Video quality").assertDoesNotExist()
             System.getProperty("tvshots")?.let { dir ->
                 scenario.onActivity { a ->
                     val v = a.window.decorView

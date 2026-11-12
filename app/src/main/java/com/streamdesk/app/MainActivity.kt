@@ -107,6 +107,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.History
@@ -325,6 +326,7 @@ private sealed interface HomeDialog {
     data class Crash(val report: String) : HomeDialog
     data object Logs : HomeDialog
     data object About : HomeDialog
+    data object Settings : HomeDialog
     data object EditSport : HomeDialog
     data object LinkPhone : HomeDialog
     data object Search : HomeDialog
@@ -1277,32 +1279,7 @@ private fun HomeScreen(
                     DrawerRow(Icons.Default.PhonelinkRing, "Continue from TV", { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.TakeOver) })
 
                     DrawerSection("Settings")
-                    DrawerRow(Icons.AutoMirrored.Filled.VolumeUp, "Sound with screen off", { backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound) }) {
-                        DrawerSwitch(backgroundSound) { backgroundSound = it; BackgroundAudio.setEnabled(context, it) }
-                    }
-                    DrawerRow(Icons.Default.GridView, "View", { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
-                        DrawerSegments(listOf("List", "Grid"), if (phoneGrid) 1 else 0) { phoneGrid = it == 1; PhoneView.setGrid(context, phoneGrid) }
-                    }
-                    DrawerRow(Icons.Default.HighQuality, "Video quality", {
-                        deviceQuality = if (deviceQuality == QualityCap.Best) QualityCap.FullHd else QualityCap.Best; DeviceQuality.set(context, deviceQuality)
-                    }) {
-                        DrawerSegments(listOf("Full HD", "4K"), if (deviceQuality == QualityCap.Best) 1 else 0) {
-                            deviceQuality = if (it == 1) QualityCap.Best else QualityCap.FullHd; DeviceQuality.set(context, deviceQuality)
-                        }
-                    }
-                    DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {
-                        saveMobileData = !saveMobileData; DeviceQuality.setSaveData(context, saveMobileData)
-                    }) { DrawerSwitch(saveMobileData) { saveMobileData = it; DeviceQuality.setSaveData(context, it) } }
-                    DrawerRow(Icons.Default.History, "Open on last channel", { openLast = !openLast; Resume.setEnabled(context, openLast) }) {
-                        DrawerSwitch(openLast) { openLast = it; Resume.setEnabled(context, it) }
-                    }
-                    DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", { pipOnLeave = !pipOnLeave; PlayerPrefs.setPipOnLeave(context, pipOnLeave) }) {
-                        DrawerSwitch(pipOnLeave) { pipOnLeave = it; PlayerPrefs.setPipOnLeave(context, it) }
-                    }
-                    DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", { channelButtons = !channelButtons; PlayerPrefs.setChannelButtons(context, channelButtons) }) {
-                        DrawerSwitch(channelButtons) { channelButtons = it; PlayerPrefs.setChannelButtons(context, it) }
-                    }
-                    if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) "Hide the link bar" else "Open a stream link", { closeDrawer(); linkBarOpen = !linkBarOpen })
+                    DrawerRow(Icons.Default.Settings, "Settings", { closeDrawer(); dialog = HomeDialog.Settings })
 
                     DrawerSection("Help")
                     DrawerRow(Icons.Default.SystemUpdate, "Check for updates", {
@@ -1356,6 +1333,39 @@ private fun HomeScreen(
             },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
+        HomeDialog.Settings -> SettingsScreen(version = appVersion, onDismiss = { dialog = null }) {
+                      DrawerSection("Video", divider = false)
+                      DrawerRow(Icons.Default.HighQuality, "Video quality", {
+                          deviceQuality = if (deviceQuality == QualityCap.Best) QualityCap.FullHd else QualityCap.Best; DeviceQuality.set(context, deviceQuality)
+                      }) {
+                          DrawerSegments(listOf("Full HD", "4K"), if (deviceQuality == QualityCap.Best) 1 else 0) {
+                              deviceQuality = if (it == 1) QualityCap.Best else QualityCap.FullHd; DeviceQuality.set(context, deviceQuality)
+                          }
+                      }
+                      DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {
+                          saveMobileData = !saveMobileData; DeviceQuality.setSaveData(context, saveMobileData)
+                      }) { DrawerSwitch(saveMobileData) { saveMobileData = it; DeviceQuality.setSaveData(context, it) } }
+                      DrawerSection("Player")
+                      DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", { pipOnLeave = !pipOnLeave; PlayerPrefs.setPipOnLeave(context, pipOnLeave) }) {
+                          DrawerSwitch(pipOnLeave) { pipOnLeave = it; PlayerPrefs.setPipOnLeave(context, it) }
+                      }
+                      DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", { channelButtons = !channelButtons; PlayerPrefs.setChannelButtons(context, channelButtons) }) {
+                          DrawerSwitch(channelButtons) { channelButtons = it; PlayerPrefs.setChannelButtons(context, it) }
+                      }
+                      DrawerRow(Icons.AutoMirrored.Filled.VolumeUp, "Sound with screen off", { backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound) }) {
+                          DrawerSwitch(backgroundSound) { backgroundSound = it; BackgroundAudio.setEnabled(context, it) }
+                      }
+                      DrawerSection("Home screen")
+                      DrawerRow(Icons.Default.GridView, "View", { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
+                          DrawerSegments(listOf("List", "Grid"), if (phoneGrid) 1 else 0) { phoneGrid = it == 1; PhoneView.setGrid(context, phoneGrid) }
+                      }
+                      DrawerRow(Icons.Default.History, "Open on last channel", { openLast = !openLast; Resume.setEnabled(context, openLast) }) {
+                          DrawerSwitch(openLast) { openLast = it; Resume.setEnabled(context, it) }
+                      }
+                      if (sources.isNotEmpty()) DrawerSection("Links")
+                      if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) "Hide the link bar" else "Open a stream link", { dialog = null; linkBarOpen = !linkBarOpen })
+
+        }
         HomeDialog.About -> AlertDialog(
             onDismissRequest = { dialog = null },
             icon = { Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(72.dp)) },

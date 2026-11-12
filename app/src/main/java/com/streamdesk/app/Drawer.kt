@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 /** The phone's side menu (☰): the app and account at the top, then channels, sharing, settings and help. */
 @Composable
@@ -144,6 +145,39 @@ fun DrawerSegments(options: List<String>, selected: Int, onSelect: (Int) -> Unit
                     .clickable { onSelect(i) }
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             )
+        }
+    }
+}
+
+/** ☰ → Settings: every setting on one full screen, in groups, with the version at the bottom. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(version: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        androidx.compose.material3.Scaffold(
+            topBar = {
+                androidx.compose.material3.TopAppBar(
+                    navigationIcon = {
+                        androidx.compose.material3.IconButton(onClick = onDismiss) {
+                            Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    title = { Text("Settings") },
+                )
+            },
+        ) { padding ->
+            Column(Modifier.padding(padding).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                content()
+                Text(
+                    "Stream Desk $version",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 22.dp, top = 24.dp),
+                )
+            }
         }
     }
 }
