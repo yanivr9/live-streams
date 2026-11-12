@@ -1,6 +1,6 @@
 {
-  "versionCode": 87,
-  "versionName": "3.66",
+  "versionCode": 88,
+  "versionName": "3.67",
   "apk": "StreamDesk.apk",
-  "notes": "Phone: the Add playlist button shrinks to + while you scroll the channels"
+  "notes": "Share an account with a QR code: Playlists → ⋮ → Share with QR code; on the other phone + Add playlist → QR code"
 }

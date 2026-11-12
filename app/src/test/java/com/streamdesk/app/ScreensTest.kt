@@ -92,8 +92,9 @@ class PhoneScreensTest {
             // The floating "Add playlist" button goes straight to the Add channels window
             compose.onNodeWithText("Add playlist", useUnmergedTree = true).performClick()
             compose.waitForIdle()
-            compose.onNodeWithText("Username & password").assertExists()
-            compose.onNodeWithText("Playlist link").assertExists()
+            compose.onNodeWithText("Login").assertExists()
+            compose.onNodeWithText("Link").assertExists()
+            compose.onNodeWithText("QR code").assertExists()
             // (Text fields inside pop-up windows never settle in this simulator, so the link page is checked in
             // linksWithoutHttpAreAccepted instead.) Username & password → Continue opens the sign-in screen
             compose.onNodeWithText("Continue").assertIsEnabled().performClick()

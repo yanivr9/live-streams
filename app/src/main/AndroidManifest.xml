@@ -48,6 +48,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="streamdesk" android:host="connect" />
             </intent-filter>
+            <!-- An account shared from another phone as a QR code: streamdesk://login?d=… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="streamdesk" android:host="login" />
+            </intent-filter>
             <!-- Open .m3u playlist files to import them -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -101,5 +108,13 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <!-- Hands the QR code picture to WhatsApp and other apps when an account is shared -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/shared_files" />
+        </provider>
     </application>
 </manifest>

@@ -73,6 +73,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.geometry.Offset
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -181,6 +182,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
+    private var sharedLogin by mutableStateOf<Pair<XtreamLogin, String?>?>(null)   // an account from another phone's QR code
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()   // the system's logo screen, until the first frame below takes over
@@ -202,7 +204,7 @@ class MainActivity : ComponentActivity() {
                     if (firstStart) importFromIntent(intent)
                     val crash = App.takeCrashReport(this@MainActivity)
                     if (firstStart && isTelevision() && intent.action == Intent.ACTION_MAIN && Resume.enabled(this@MainActivity)) resumeLast(store)
-                    home = { HomeScreen(store, ::openPlayer, crash, invite) { invite = null } }
+                    home = { HomeScreen(store, ::openPlayer, crash, invite, { invite = null }, sharedLogin) { sharedLogin = null } }
                     withFrameNanos { }
                     // Long enough to be seen on a real start; at once when the screen is only rebuilt (turning the device)
                     if (firstStart) delay((LAUNCH_MIN_MS - (SystemClock.uptimeMillis() - shownAt)).coerceAtLeast(0))
@@ -238,6 +240,12 @@ class MainActivity : ComponentActivity() {
     /** Handles a .m3u file opened from a file manager or browser download. */
     private fun importFromIntent(intent: Intent) {
         val uri = intent.data ?: return
+        if (uri.scheme == "streamdesk" && uri.host == "login") {   // an account shared from another phone as a QR code
+            val parsed = LoginQr.parse(uri.toString())
+            if (parsed != null) sharedLogin = parsed
+            else Toast.makeText(this, "That QR code doesn't hold a Stream Desk account.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (uri.scheme == "streamdesk") {   // the link behind a TV's QR code
             val parsed = LinkInvite.parse(uri.toString())
             if (parsed != null) invite = parsed
@@ -298,6 +306,10 @@ private sealed interface HomeDialog {
     data object LinkPhone : HomeDialog
     data object Search : HomeDialog
     data class Invite(val invite: LinkInvite) : HomeDialog
+    /** Showing an account as a QR code for another phone. */
+    data class ShareQr(val source: PlaylistSource) : HomeDialog
+    /** An account read from another phone's QR code, waiting for "Add account". */
+    data class SharedLogin(val login: XtreamLogin, val name: String?) : HomeDialog
     data class PickTv(val job: TvJob) : HomeDialog
     data class Update(val info: UpdateInfo) : HomeDialog
     data class Guide(val channel: Channel, val login: XtreamLogin) : HomeDialog
@@ -325,6 +337,8 @@ private fun HomeScreen(
     crashReport: String? = null,
     invite: LinkInvite? = null,
     onInviteDone: () -> Unit = {},
+    sharedLogin: Pair<XtreamLogin, String?>? = null,
+    onSharedLoginDone: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -468,6 +482,19 @@ private fun HomeScreen(
     }
 
     LaunchedEffect(invite) { invite?.let { dialog = HomeDialog.Invite(it) } }
+    LaunchedEffect(sharedLogin) { sharedLogin?.let { (login, name) -> dialog = HomeDialog.SharedLogin(login, name); onSharedLoginDone() } }
+    // + Add playlist → QR code: a picture of the QR code from the gallery
+    val pickQr = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val found = withContext(Dispatchers.IO) {
+                runCatching { LoginQr.readPicture(context, uri)?.let(LoginQr::decode) }.getOrNull()
+            }
+            val parsed = LoginQr.parse(found)
+            if (parsed != null) dialog = HomeDialog.SharedLogin(parsed.first, parsed.second)
+            else notify(if (found == null) "No QR code found in that picture." else "That QR code isn't a Stream Desk account.")
+        }
+    }
     // A new version, if there is one: ask once when the app opens
     LaunchedEffect(Unit) {
         delay(STARTUP_QUIET_MS * 2)
@@ -943,6 +970,7 @@ private fun HomeScreen(
                     onToggle = { store.setEnabled(it.url, !it.enabled) },
                     onLogs = { dialog = HomeDialog.Logs },
                     onSendLogin = if (isTv) null else { source -> dialog = HomeDialog.PickTv(TvJob.Login(source)) },
+                    onShareQr = if (isTv) null else { source -> dialog = HomeDialog.ShareQr(source) },
                     onCopy = { clipboard.setText(AnnotatedString(it.url)); notify("Link copied.") },
                     onRemove = { dialog = HomeDialog.RemovePlaylist(it) },
                     modifier = Modifier.weight(1f),
@@ -1180,8 +1208,16 @@ private fun HomeScreen(
             },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
+        is HomeDialog.ShareQr -> ShareLoginDialog(d.source, onDismiss = { dialog = null }, onDone = { notify(it) })
+        is HomeDialog.SharedLogin -> AddSharedLoginDialog(
+            login = d.login,
+            name = d.name,
+            onAdd = { dialog = null; addLogin(d.login, d.name); notify("Account added. Loading the channels…") },
+            onDismiss = { dialog = null },
+        )
         is HomeDialog.AddPlaylist -> AddPlaylistDialog(
             linkFirst = d.linkFirst,
+            onPickQr = { dialog = null; pickQr.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             onImportFile = { dialog = null; openFile.launch(arrayOf("*/*")) },
             onPasteText = { dialog = HomeDialog.PasteText },
             initialLink = clipboard.getText()?.text?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) && ' ' !in it }.orEmpty(),
@@ -1333,6 +1369,7 @@ private fun PlaylistsPane(
     onToggle: (PlaylistSource) -> Unit,
     onLogs: () -> Unit,
     onSendLogin: ((PlaylistSource) -> Unit)?,
+    onShareQr: ((PlaylistSource) -> Unit)?,
     onCopy: (PlaylistSource) -> Unit,
     onRemove: (PlaylistSource) -> Unit,
     modifier: Modifier = Modifier,
@@ -1411,6 +1448,9 @@ private fun PlaylistsPane(
                                 if (onSendLogin != null && s.xtream != null) {
                                     AppMenuItem(text = { Text("Send login to TV") }, onClick = { menu = false; onSendLogin(s) })
                                 }
+                                if (onShareQr != null && s.xtream != null) {
+                                    AppMenuItem(text = { Text("Share with QR code") }, onClick = { menu = false; onShareQr(s) })
+                                }
                                 AppMenuItem(text = { Text("Show logs") }, onClick = { menu = false; onLogs() })
                                 AppMenuItem(text = { Text("Copy link") }, onClick = { menu = false; onCopy(s) })
                                 AppMenuItem(text = { Text("Remove playlist") }, onClick = { menu = false; onRemove(s) })
@@ -1451,8 +1491,10 @@ internal fun normalizeLink(text: String): String? {
  * and password in it is sent to the sign-in screen, filled in.
  */
 @Composable
-private fun AddPlaylistDialog(linkFirst: Boolean, onImportFile: () -> Unit, onPasteText: () -> Unit, initialLink: String, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit, onSignIn: (XtreamLogin?) -> Unit) {
-    var useLink by rememberSaveable { mutableStateOf(linkFirst || (initialLink.isNotEmpty() && !XtreamLogin.isLoginLink(initialLink))) }
+private fun AddPlaylistDialog(linkFirst: Boolean, onPickQr: () -> Unit, onImportFile: () -> Unit, onPasteText: () -> Unit, initialLink: String, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit, onSignIn: (XtreamLogin?) -> Unit) {
+    // 0 = username & password, 1 = playlist link, 2 = QR code from another phone
+    var mode by rememberSaveable { mutableStateOf(if (linkFirst || (initialLink.isNotEmpty() && !XtreamLogin.isLoginLink(initialLink))) 1 else 0) }
+    val useLink = mode == 1
     var link by rememberSaveable { mutableStateOf(initialLink) }
     var name by rememberSaveable { mutableStateOf("") }
     val normalized = normalizeLink(link)
@@ -1463,14 +1505,20 @@ private fun AddPlaylistDialog(linkFirst: Boolean, onImportFile: () -> Unit, onPa
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    SegmentedButton(selected = !useLink, onClick = { useLink = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
-                        Text("Username & password", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    SegmentedButton(selected = useLink, onClick = { useLink = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) {
-                        Text("Playlist link", maxLines = 1)
+                    listOf("Login", "Link", "QR code").forEachIndexed { i, label ->
+                        SegmentedButton(selected = mode == i, onClick = { mode = i }, shape = SegmentedButtonDefaults.itemShape(i, 3), icon = {}) {
+                            Text(label, maxLines = 1)
+                        }
                     }
                 }
-                if (!useLink) {
+                if (mode == 2) {
+                    Text(
+                        "Add an account shared from another phone (Playlists → ⋮ → Share with QR code). " +
+                            "Pick the QR code picture from the gallery, or point this phone's camera at the QR code.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (!useLink) {
                     Text(
                         "Sign in with the server address, username and password your IPTV provider gave you. " +
                             "Best for providers: channels with logos, folders and the TV guide.",
@@ -1519,6 +1567,7 @@ private fun AddPlaylistDialog(linkFirst: Boolean, onImportFile: () -> Unit, onPa
         },
         confirmButton = {
             when {
+                mode == 2 -> TextButton(onClick = onPickQr) { Text("Pick the picture") }
                 !useLink -> TextButton(onClick = { onSignIn(null) }) { Text("Continue") }
                 loginInLink != null -> TextButton(onClick = { onSignIn(loginInLink) }) { Text("Sign in") }
                 else -> TextButton(onClick = { onConfirm(normalized!!, name.trim()) }, enabled = normalized != null) { Text("Add") }
