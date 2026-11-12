@@ -107,6 +107,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.PictureInPictureAlt
@@ -326,6 +330,8 @@ private sealed interface HomeDialog {
     data class Crash(val report: String) : HomeDialog
     data object Logs : HomeDialog
     data object About : HomeDialog
+    /** ☰ → the account card: choose which playlist's channels to show. */
+    data object PickAccount : HomeDialog
     data object Settings : HomeDialog
     data object EditSport : HomeDialog
     data object LinkPhone : HomeDialog
@@ -401,6 +407,14 @@ private fun HomeScreen(
         snackbar.currentSnackbarData?.dismiss()
         snackbar.showSnackbar(msg)
     }
+
+    /** One account at a time: show [s]'s channels and turn the other playlists off (they stay saved). */
+    fun selectAccount(s: PlaylistSource) {
+        store.useOnly(s.url)
+        sourceFilter = null; group = null
+        notify("Now showing ${s.name}.")
+    }
+
 
     fun loadPlaylist(link: String, name: String? = null, prefetched: Fetched? = null, quiet: Boolean = false) {
         if (!quiet && store.sources.value.none { it.url == link }) section = Section.Playlists
@@ -1032,6 +1046,7 @@ private fun HomeScreen(
                         onLogs = { dialog = HomeDialog.Logs },
                         onSendLogin = if (isTv) null else { source -> dialog = HomeDialog.PickTv(TvJob.Login(source)) },
                         onShareQr = if (isTv) null else { source -> dialog = HomeDialog.ShareQr(source) },
+                    onSelect = { selectAccount(it) },
                         onCopy = { clipboard.setText(AnnotatedString(it.url)); notify("Link copied.") },
                         onRemove = { dialog = HomeDialog.RemovePlaylist(it) },
                         modifier = Modifier.weight(1f),
@@ -1247,7 +1262,7 @@ private fun HomeScreen(
                     version = appVersion,
                     account = mainAccount?.name,
                     accountDetail = mainAccount?.let { "%,d channels".format(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · updated " + updatedAgo(it.updatedAt) else "" },
-                    onAccount = { closeDrawer(); section = Section.Playlists },
+                    onAccount = { closeDrawer(); if (sources.size > 1) dialog = HomeDialog.PickAccount else section = Section.Playlists },
                 ) {
                     fun go(s: Section) { closeDrawer(); section = s; sourceFilter = null; group = null }
                     DrawerSection("Channels", divider = false)
@@ -1366,6 +1381,38 @@ private fun HomeScreen(
                       if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) "Hide the link bar" else "Open a stream link", { dialog = null; linkBarOpen = !linkBarOpen })
 
         }
+        HomeDialog.PickAccount -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Choose the account") },
+            text = {
+                Column {
+                    sources.forEach { s ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { dialog = null; selectAccount(s) }.padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = s.enabled, onClick = { dialog = null; selectAccount(s) }, colors = RadioButtonDefaults.colors(selectedColor = Amber))
+                            Column(Modifier.weight(1f)) {
+                                Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (s.enabled) FontWeight.SemiBold else FontWeight.Normal)
+                                Text(
+                                    "%,d channels".format(s.channelCount) + (s.xtream?.let { " · ${it.username}" } ?: ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "The others stay saved, just turned off.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { dialog = null; section = Section.Playlists }) { Text("Manage playlists") } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
         HomeDialog.About -> AlertDialog(
             onDismissRequest = { dialog = null },
             icon = { Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(72.dp)) },
@@ -1541,6 +1588,7 @@ private fun PlaylistsPane(
     onLogs: () -> Unit,
     onSendLogin: ((PlaylistSource) -> Unit)?,
     onShareQr: ((PlaylistSource) -> Unit)?,
+    onSelect: (PlaylistSource) -> Unit,
     onCopy: (PlaylistSource) -> Unit,
     onRemove: (PlaylistSource) -> Unit,
     modifier: Modifier = Modifier,
@@ -1577,6 +1625,17 @@ private fun PlaylistsPane(
             ListItem(
                 modifier = Modifier.clickable { onShow(s) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                // The round selector: the playlist whose channels show. Choosing one turns the others off.
+                leadingContent = if (sources.size > 1) {
+                    {
+                        RadioButton(
+                            selected = s.enabled,
+                            onClick = { onSelect(s) },
+                            colors = RadioButtonDefaults.colors(selectedColor = Amber),
+                            modifier = Modifier.semantics { contentDescription = "Use ${s.name}" },
+                        )
+                    }
+                } else null,
                 headlineContent = {
                     Text(
                         if (s.enabled) s.name else "${s.name} (off)",

@@ -210,6 +210,12 @@ class ChannelStore private constructor(context: Context) {
     }
 
     /** Hides or shows a playlist's channels without deleting them. */
+    /** Makes [url] the one active playlist: its channels show, every other playlist is turned off (and kept). */
+    fun useOnly(url: String) {
+        _sources.value = _sources.value.map { it.copy(enabled = it.url == url) }
+        save(FILE_SOURCES, _sources.value, PlaylistSource::toJson)
+    }
+
     fun setEnabled(url: String, enabled: Boolean) {
         _sources.value = _sources.value.map { if (it.url == url) it.copy(enabled = enabled) else it }
         save(FILE_SOURCES, _sources.value, PlaylistSource::toJson)
