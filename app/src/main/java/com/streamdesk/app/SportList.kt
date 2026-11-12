@@ -24,11 +24,22 @@ data class SportSettings(val text: String, val cap: QualityCap) {
 object DeviceQuality {
     private fun prefs(context: Context) = context.getSharedPreferences("launch", Context.MODE_PRIVATE)
 
-    fun cap(context: Context): QualityCap =
-        if (!context.isTelevision()) QualityCap.Best
-        else runCatching { QualityCap.valueOf(prefs(context).getString("tv_quality", null).orEmpty()) }.getOrDefault(QualityCap.FullHd)
+    // A phone has its own choice (☰ → Video quality), 4K allowed unless turned down
+    private fun key(context: Context) = if (context.isTelevision()) "tv_quality" else "phone_quality"
 
-    fun set(context: Context, cap: QualityCap) = prefs(context).edit().putString("tv_quality", cap.name).apply()
+    fun cap(context: Context): QualityCap =
+        runCatching { QualityCap.valueOf(prefs(context).getString(key(context), null).orEmpty()) }
+            .getOrDefault(if (context.isTelevision()) QualityCap.FullHd else QualityCap.Best)
+
+    fun set(context: Context, cap: QualityCap) = prefs(context).edit().putString(key(context), cap.name).apply()
+
+    /** ☰ → Lower quality on mobile data: on a phone off Wi-Fi, at most Full HD (on by default). */
+    fun saveData(context: Context): Boolean = prefs(context).getBoolean("save_mobile_data", true)
+    fun setSaveData(context: Context, on: Boolean) = prefs(context).edit().putBoolean("save_mobile_data", on).apply()
+
+    /** The limit right now: the chosen one, lowered to Full HD on mobile data when that setting is on. */
+    fun effective(context: Context, chosen: QualityCap, onMobileData: Boolean): QualityCap =
+        if (!context.isTelevision() && onMobileData && saveData(context) && chosen.maxScore > QualityCap.FullHd.maxScore) QualityCap.FullHd else chosen
 }
 
 /**

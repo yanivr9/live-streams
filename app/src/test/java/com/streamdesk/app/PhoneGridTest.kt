@@ -9,6 +9,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.printToLog
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTouchInput
@@ -85,6 +89,13 @@ class PhoneGridTest {
             compose.onNodeWithContentDescription("Menu").performClick(); settle()
             compose.onNodeWithText("Share account with QR code").assertExists()
             compose.onNodeWithText("Sound with screen off").assertExists()
+            compose.onNodeWithText("Video quality").assertExists()
+            // The switch on the "CH + / − buttons on the picture" row turns the buttons off and on again
+            val chSwitch = compose.onNode(androidx.compose.ui.test.isToggleable() and androidx.compose.ui.test.hasAnySibling(hasText("CH + / − buttons on the picture")), useUnmergedTree = true)
+            chSwitch.performScrollTo().performClick(); settle()
+            assertFalse(PlayerPrefs.channelButtons(context))
+            chSwitch.performClick(); settle()
+            assertTrue(PlayerPrefs.channelButtons(context))
             System.getProperty("tvshots")?.let { dir ->
                 scenario.onActivity { a ->
                     val v = a.window.decorView

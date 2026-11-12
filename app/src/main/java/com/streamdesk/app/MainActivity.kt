@@ -107,6 +107,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -220,7 +225,7 @@ class MainActivity : ComponentActivity() {
                     val store = ChannelStore.get(this@MainActivity)
                     if (firstStart) importFromIntent(intent)
                     val crash = App.takeCrashReport(this@MainActivity)
-                    if (firstStart && isTelevision() && intent.action == Intent.ACTION_MAIN && Resume.enabled(this@MainActivity)) resumeLast(store)
+                    if (firstStart && intent.action == Intent.ACTION_MAIN && Resume.enabled(this@MainActivity)) resumeLast(store)
                     home = { HomeScreen(store, ::openPlayer, crash, invite, { invite = null }, sharedLogin) { sharedLogin = null } }
                     withFrameNanos { }
                     // Long enough to be seen on a real start; at once when the screen is only rebuilt (turning the device)
@@ -598,13 +603,19 @@ private fun HomeScreen(
     }
     // The Sport tab: the channels chosen in the Sport list, each in its best quality
     var deviceQuality by remember { mutableStateOf(DeviceQuality.cap(context)) }
-    val sportPicked = remember(scoped, sportSettings, deviceQuality) { SportList.pick(scoped, sportSettings.limitedTo(deviceQuality)) }
+    var saveMobileData by remember { mutableStateOf(DeviceQuality.saveData(context)) }
+    val onMobileData by rememberOnMobileData()
+    // What the lists may pick right now: the chosen quality, lowered on mobile data when ☰ → Lower quality on mobile data is on
+    val qualityNow = remember(deviceQuality, saveMobileData, onMobileData) { DeviceQuality.effective(context, deviceQuality, onMobileData) }
+    var pipOnLeave by remember { mutableStateOf(PlayerPrefs.pipOnLeave(context)) }
+    var channelButtons by remember { mutableStateOf(PlayerPrefs.channelButtons(context)) }
+    val sportPicked = remember(scoped, sportSettings, qualityNow) { SportList.pick(scoped, sportSettings.limitedTo(qualityNow)) }
     fun loginFor(ch: Channel): XtreamLogin? = if (ch.kind == Kind.LIVE) sources.firstOrNull { it.url == ch.source }?.xtream else null
     fun playSport(ch: Channel) {
         val i = sportPicked.indexOfFirst { it.url == ch.url }
         if (i >= 0) onPlay(sportPicked, i, StreamFormat.Auto) else onPlay(listOf(ch), 0, StreamFormat.Auto)
     }
-    val israelPicked = remember(scoped, deviceQuality) { IsraelList.pick(scoped, deviceQuality) }
+    val israelPicked = remember(scoped, qualityNow) { IsraelList.pick(scoped, qualityNow) }
     // The guide on every channel: each row or tile asks for its own now/next as it shows (see NowOn)
     val guides by NowOn.guides.collectAsState()
     val nowSeconds = rememberNowSeconds()
@@ -1271,6 +1282,25 @@ private fun HomeScreen(
                     }
                     DrawerRow(Icons.Default.GridView, "View", { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
                         DrawerSegments(listOf("List", "Grid"), if (phoneGrid) 1 else 0) { phoneGrid = it == 1; PhoneView.setGrid(context, phoneGrid) }
+                    }
+                    DrawerRow(Icons.Default.HighQuality, "Video quality", {
+                        deviceQuality = if (deviceQuality == QualityCap.Best) QualityCap.FullHd else QualityCap.Best; DeviceQuality.set(context, deviceQuality)
+                    }) {
+                        DrawerSegments(listOf("Full HD", "4K"), if (deviceQuality == QualityCap.Best) 1 else 0) {
+                            deviceQuality = if (it == 1) QualityCap.Best else QualityCap.FullHd; DeviceQuality.set(context, deviceQuality)
+                        }
+                    }
+                    DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {
+                        saveMobileData = !saveMobileData; DeviceQuality.setSaveData(context, saveMobileData)
+                    }) { DrawerSwitch(saveMobileData) { saveMobileData = it; DeviceQuality.setSaveData(context, it) } }
+                    DrawerRow(Icons.Default.History, "Open on last channel", { openLast = !openLast; Resume.setEnabled(context, openLast) }) {
+                        DrawerSwitch(openLast) { openLast = it; Resume.setEnabled(context, it) }
+                    }
+                    DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", { pipOnLeave = !pipOnLeave; PlayerPrefs.setPipOnLeave(context, pipOnLeave) }) {
+                        DrawerSwitch(pipOnLeave) { pipOnLeave = it; PlayerPrefs.setPipOnLeave(context, it) }
+                    }
+                    DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", { channelButtons = !channelButtons; PlayerPrefs.setChannelButtons(context, channelButtons) }) {
+                        DrawerSwitch(channelButtons) { channelButtons = it; PlayerPrefs.setChannelButtons(context, it) }
                     }
                     if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) "Hide the link bar" else "Open a stream link", { closeDrawer(); linkBarOpen = !linkBarOpen })
 

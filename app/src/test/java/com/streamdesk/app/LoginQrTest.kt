@@ -47,3 +47,23 @@ class LoginQrTest {
         assertEquals(login to "Yossi's account", LoginQr.parse(LoginQr.decode(shot)))
     }
 }
+
+/** ☰ → Video quality and Lower quality on mobile data: what the phone's lists may pick. */
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [34])
+class PhoneQualityTest {
+    private val context: android.content.Context get() = androidx.test.core.app.ApplicationProvider.getApplicationContext()
+
+    @Test
+    fun mobileDataLowersOnlyWhenTurnedOn() {
+        DeviceQuality.set(context, QualityCap.Best)
+        assertEquals(QualityCap.Best, DeviceQuality.cap(context))
+        DeviceQuality.setSaveData(context, true)
+        assertEquals(QualityCap.FullHd, DeviceQuality.effective(context, QualityCap.Best, onMobileData = true))
+        assertEquals(QualityCap.Best, DeviceQuality.effective(context, QualityCap.Best, onMobileData = false))
+        DeviceQuality.setSaveData(context, false)
+        assertEquals(QualityCap.Best, DeviceQuality.effective(context, QualityCap.Best, onMobileData = true))
+        DeviceQuality.set(context, QualityCap.FullHd)
+        assertEquals(QualityCap.FullHd, DeviceQuality.cap(context))
+    }
+}

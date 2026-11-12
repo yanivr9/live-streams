@@ -395,7 +395,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         // Android 12+ enters PiP on its own via setAutoEnterEnabled
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player.isPlaying) enterPip()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player.isPlaying && PlayerPrefs.pipOnLeave(this)) enterPip()
     }
 
     // ---------- loading ----------
@@ -879,7 +879,7 @@ class PlayerActivity : ComponentActivity() {
         val clamped = ratio.coerceIn(1 / 2.39f, 2.39f)
         return PictureInPictureParams.Builder()
             .setAspectRatio(Rational((clamped * 1000).toInt(), 1000))
-            .apply { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setAutoEnterEnabled(true) }
+            .apply { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setAutoEnterEnabled(PlayerPrefs.pipOnLeave(this@PlayerActivity)) }
             .build()
     }
 
@@ -948,7 +948,8 @@ class PlayerActivity : ComponentActivity() {
 
             if (!isTv && queue.size > 1) {
                 AnimatedVisibility(
-                    visible = controlsVisible,
+                    // ☰ → CH + / − buttons on the picture can hide them (the channel list in the player still changes channel)
+                    visible = controlsVisible && PlayerPrefs.channelButtons(this@PlayerActivity),
                     enter = fadeIn(),
                     exit = fadeOut(),
                     modifier = Modifier
