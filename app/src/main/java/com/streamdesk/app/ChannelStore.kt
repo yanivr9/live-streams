@@ -247,6 +247,8 @@ class ChannelStore private constructor(context: Context) {
                 error = result.problems,
                 userAgent = result.userAgent,
                 account = result.account,
+                // Keep the address that worked (http:// after an https:// one failed), so the TV guide uses it too
+                xtream = latest.xtream?.let { x -> if (result.server.isNotBlank() && result.server != x.server) x.copy(server = result.server) else x },
             )
         )
         return count

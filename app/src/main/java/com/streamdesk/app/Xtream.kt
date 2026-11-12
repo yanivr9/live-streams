@@ -104,6 +104,8 @@ data class XtreamResult(
     val account: String,
     val failedKinds: Set<String> = emptySet(),
     val problems: String = "",
+    /** The server address that worked: http:// when an https:// one fell back to plain http. */
+    val server: String = "",
 )
 
 object Xtream {
@@ -230,7 +232,7 @@ object Xtream {
             user.optString("max_connections").toIntOrNull()?.let { add(if (it == 1) "1 screen" else "$it screens") }
         }.joinToString(" · ")
 
-        XtreamResult(out, ua, account, failed.keys, failed.values.joinToString("; "))
+        XtreamResult(out, ua, account, failed.keys, failed.values.joinToString("; "), login.server)
     }
 
     /** Lists a series' episodes as playable items, in season and episode order. */
