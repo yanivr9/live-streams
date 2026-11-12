@@ -44,9 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 fun DrawerColumn(version: String, account: String?, accountDetail: String?, onAccount: () -> Unit, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 22.dp, bottom = 16.dp).navigationBarsPadding()) {
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.requiredSize(78.dp))
-            }
+            AppLogo(48.dp)
             Spacer(Modifier.width(12.dp))
             Column {
                 BrandName(style = MaterialTheme.typography.titleLarge)

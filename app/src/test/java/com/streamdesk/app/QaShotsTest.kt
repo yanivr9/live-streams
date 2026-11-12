@@ -25,6 +25,7 @@ import java.io.File
 abstract class QaShotsBase {
     @get:Rule val compose = createEmptyComposeRule()
     abstract val tag: String
+    open val theme: ThemeMode = ThemeMode.Dark
 
     @Test
     fun screens() {
@@ -33,6 +34,7 @@ abstract class QaShotsBase {
         val context: Context = ApplicationProvider.getApplicationContext()
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_TOUCHSCREEN, true)
         seedChannels(context)
+        ThemePrefs.set(context, theme)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.mainClock.autoAdvance = false
             fun shot(name: String) {
@@ -73,3 +75,7 @@ class QaShotsPhoneSideways : QaShotsBase() { override val tag = "sideways" }
 @RunWith(AndroidJUnit4::class) @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w800dp-h1280dp-port-xhdpi")
 class QaShotsTablet : QaShotsBase() { override val tag = "tablet" }
+
+@RunWith(AndroidJUnit4::class) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
+class QaShotsPhoneLight : QaShotsBase() { override val tag = "light"; override val theme = ThemeMode.Light }

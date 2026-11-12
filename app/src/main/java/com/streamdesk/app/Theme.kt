@@ -2,6 +2,12 @@ package com.streamdesk.app
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import android.content.Context
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -33,13 +39,63 @@ private val DeskColors = darkColorScheme(
     error = OnAir,
 )
 
+/** The same app in white: light backgrounds, dark text, the same orange. */
+private val LightColors = lightColorScheme(
+    primary = Color(0xFFB86200),            // orange dark enough to read on white
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE2BF),
+    onPrimaryContainer = Color(0xFF5A3000),
+    secondaryContainer = Color(0xFFFFE2BF),
+    onSecondaryContainer = Color(0xFF5A3000),
+    background = Color(0xFFF6F7F8),
+    onBackground = Color(0xFF15191C),
+    surface = Color(0xFFF6F7F8),
+    onSurface = Color(0xFF15191C),
+    surfaceVariant = Color(0xFFE6EAEC),
+    onSurfaceVariant = Color(0xFF55616A),
+    surfaceContainer = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFEFF2F4),
+    surfaceContainerHighest = Color(0xFFE6EAEC),
+    outline = Color(0xFFB9C2C8),
+    outlineVariant = Color(0xFFDCE1E4),
+    error = Color(0xFFD32F2F),
+)
+
+/** ☰ → Settings → Theme: like the phone (default), always dark, or always light. The TV and the player stay dark. */
+enum class ThemeMode(val label: String) { System("Like the phone"), Dark("Dark"), Light("Light") }
+
+object ThemePrefs {
+    private fun prefs(context: Context) = context.getSharedPreferences("look", Context.MODE_PRIVATE)
+    /** The choice in force, read by every screen so a change shows at once. */
+    var mode by mutableStateOf(ThemeMode.System)
+        private set
+
+    fun load(context: Context) {
+        mode = runCatching { ThemeMode.valueOf(prefs(context).getString("theme", null).orEmpty()) }.getOrDefault(ThemeMode.System)
+    }
+
+    fun set(context: Context, value: ThemeMode) {
+        mode = value
+        prefs(context).edit().putString("theme", value.name).apply()
+    }
+}
+
+/** Whether the app is drawn dark right now. */
 @Composable
-fun StreamDeskTheme(isTv: Boolean = false, content: @Composable () -> Unit) {
+fun isAppDark(isTv: Boolean = LocalIsTv.current): Boolean = isTv || when (ThemePrefs.mode) {
+    ThemeMode.System -> isSystemInDarkTheme()
+    ThemeMode.Dark -> true
+    ThemeMode.Light -> false
+}
+
+@Composable
+fun StreamDeskTheme(isTv: Boolean = false, alwaysDark: Boolean = false, content: @Composable () -> Unit) {
     // A TV is read from the sofa: scale everything up, and show the remote's selection
     val base = LocalDensity.current
     val density = if (isTv) Density(base.density * 1.3f, base.fontScale) else base
     CompositionLocalProvider(LocalIsTv provides isTv, LocalDensity provides density) {
-        MaterialTheme(colorScheme = if (isTv) DeskColors.copy(onSurfaceVariant = Color(0xFFC4CDD2)) else DeskColors) {
+        val dark = alwaysDark || isAppDark(isTv)
+        MaterialTheme(colorScheme = if (isTv) DeskColors.copy(onSurfaceVariant = Color(0xFFC4CDD2)) else if (dark) DeskColors else LightColors) {
             if (isTv) CompositionLocalProvider(LocalIndication provides TvFocusIndication, content = content) else content()
         }
     }

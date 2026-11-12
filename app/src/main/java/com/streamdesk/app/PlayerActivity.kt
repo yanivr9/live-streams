@@ -263,7 +263,7 @@ class PlayerActivity : ComponentActivity() {
                 finish()
             }
         }
-        setContent { StreamDeskTheme(isTv = isTv) { PlayerScreen() } }
+        setContent { StreamDeskTheme(isTv = isTv, alwaysDark = true) { PlayerScreen() } }   // video is watched on black, in any theme
 
         if (!loadFromIntent(intent)) {
             finish()

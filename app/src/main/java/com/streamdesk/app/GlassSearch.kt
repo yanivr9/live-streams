@@ -38,11 +38,17 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
 /** The frosted look shared by the search button and bar: see-through white with a light rim and a soft shadow. */
-private fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape) = this
-    .shadow(8.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
-    .clip(shape)
-    .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.07f))))
-    .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.10f))), shape)
+@Composable
+private fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape): Modifier {
+    // Frosted white over the dark theme; frosted grey over the light one
+    val tint = MaterialTheme.colorScheme.onSurface
+    val light = !isAppDark()
+    return this
+        .shadow(if (light) 4.dp else 8.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+        .clip(shape)
+        .background(Brush.verticalGradient(if (light) listOf(Color.White, Color(0xFFEFF2F4)) else listOf(tint.copy(alpha = 0.16f), tint.copy(alpha = 0.07f))))
+        .border(1.dp, Brush.verticalGradient(listOf(tint.copy(alpha = if (light) 0.18f else 0.32f), tint.copy(alpha = if (light) 0.08f else 0.10f))), shape)
+}
 
 /** A round glass button for the phone's top bar. */
 @Composable
@@ -84,10 +90,10 @@ fun GlassSearchField(
             )
         }
         Box(
-            Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.14f)).clickable(role = Role.Button, onClick = onClose),
+            Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)).clickable(role = Role.Button, onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Close, contentDescription = "Close search", tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Close, contentDescription = "Close search", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
         }
     }
 }

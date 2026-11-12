@@ -107,6 +107,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -222,8 +223,18 @@ class MainActivity : ComponentActivity() {
         // On a phone the channels screen stays upright; the player still turns for full-screen video
         if (!isTelevision() && resources.configuration.smallestScreenWidthDp < 600) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
+        ThemePrefs.load(this)
         val firstStart = savedInstanceState == null
         setContent {
+            // The status bar's clock and icons follow the app's theme (white on dark, dark on light)
+            val dark = isAppDark(isTelevision())
+            LaunchedEffect(dark) {
+                val clear = android.graphics.Color.TRANSPARENT
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(clear) else androidx.activity.SystemBarStyle.light(clear, clear),
+                    navigationBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(clear) else androidx.activity.SystemBarStyle.light(clear, clear),
+                )
+            }
             StreamDeskTheme(isTv = isTelevision()) {
                 // The loading screen is the first thing drawn; the heavy part (reading the saved channels, building the
                 // home screen) starts after that frame, so the screen is never just black while the app starts
@@ -757,7 +768,7 @@ private fun HomeScreen(
                     }
                     if (!LocalIsTv.current) {
                         GlassButton(onClick = { searchOpen = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search channels", tint = Color.White, modifier = Modifier.size(22.dp))
+                            Icon(Icons.Default.Search, contentDescription = "Search channels", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
                         }
                     }
                     if (!LocalIsTv.current) {
@@ -894,12 +905,7 @@ private fun HomeScreen(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // The app's logo (the same as on the loading screen), on a small rounded tile
-                            Box(
-                                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Image(painterResource(R.drawable.splash_icon), contentDescription = "Livio logo", modifier = Modifier.requiredSize(58.dp))
-                            }
+                            AppLogo(36.dp)
                             Spacer(Modifier.width(12.dp))
                             BrandName(style = MaterialTheme.typography.titleLarge)
                         }
@@ -1375,7 +1381,13 @@ private fun HomeScreen(
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
         )
         HomeDialog.Settings -> SettingsScreen(version = appVersion, onDismiss = { dialog = null }) {
-                      DrawerSection("Video", divider = false)
+                      DrawerSection("Look", divider = false)
+                      DrawerRow(Icons.Default.DarkMode, "Theme", {
+                          ThemePrefs.set(context, ThemeMode.entries[(ThemePrefs.mode.ordinal + 1) % ThemeMode.entries.size])
+                      }) {
+                          DrawerSegments(listOf("Phone", "Dark", "Light"), ThemePrefs.mode.ordinal) { ThemePrefs.set(context, ThemeMode.entries[it]) }
+                      }
+                      DrawerSection("Video")
                       DrawerRow(Icons.Default.HighQuality, "Video quality", {
                           deviceQuality = if (deviceQuality == QualityCap.Best) QualityCap.FullHd else QualityCap.Best; DeviceQuality.set(context, deviceQuality)
                       }) {
@@ -1441,7 +1453,7 @@ private fun HomeScreen(
         )
         HomeDialog.About -> AlertDialog(
             onDismissRequest = { dialog = null },
-            icon = { Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(72.dp)) },
+            icon = { AppLogo(64.dp) },
             title = { BrandName(style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Text(

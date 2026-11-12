@@ -22,6 +22,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -39,16 +41,16 @@ fun LaunchScreen(modifier: Modifier = Modifier) {
         initialValue = 0.94f, targetValue = 1.06f,
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "scale",
     )
-    Box(modifier.fillMaxSize().background(Color(0xFF0E1113)), contentAlignment = Alignment.Center) {
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(168.dp).scale(scale))
+            AppLogo(104.dp, Modifier.scale(scale))
             Spacer(Modifier.height(8.dp))
-            BrandName(style = MaterialTheme.typography.displaySmall, color = Color(0xFFECEFF1))
-            Text("Live TV, everywhere", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFC4CDD2))
+            BrandName(style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onBackground)
+            Text("Live TV, everywhere", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
-            LinearProgressIndicator(modifier = Modifier.width(200.dp), color = Color(0xFFFF9F1C), trackColor = Color(0xFF1E272C))
+            LinearProgressIndicator(modifier = Modifier.width(200.dp), color = Color(0xFFFF9F1C), trackColor = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.height(12.dp))
-            Text("Loading your channels…", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF9AA5AB))
+            Text("Loading your channels…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -72,4 +74,19 @@ fun BrandName(
         color = color,
         modifier = modifier,
     )
+}
+
+/** The app's logo on its own dark tile (like the phone's app icon), so it reads on light and dark screens alike. */
+@Composable
+fun AppLogo(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(size)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(size * 0.27f))
+            .background(Color(0xFF1D2327)),
+        contentAlignment = Alignment.Center,
+    ) {
+        // The drawing fills the middle of a bigger canvas (it was made for the splash screen), so it is drawn larger
+        Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.requiredSize(size * 1.62f))
+    }
 }
