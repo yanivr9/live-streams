@@ -1,6 +1,6 @@
 {
-  "versionCode": 91,
-  "versionName": "3.70",
+  "versionCode": 92,
+  "versionName": "3.71",
   "apk": "StreamDesk.apk",
-  "notes": "Phone settings in the ☰ menu: video quality, lower quality on mobile data, open on last channel, small window when leaving, CH +/− buttons on the picture"
+  "notes": "All phone settings on their own Settings screen (☰ → Settings)"
 }
