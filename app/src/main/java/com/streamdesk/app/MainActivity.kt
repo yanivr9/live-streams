@@ -764,6 +764,19 @@ private fun HomeScreen(
         onDispose { if (HomeKeys.handler === handler) HomeKeys.handler = null }
     }
 
+    // The Add playlist button shrinks to just + while the channels scroll down, and opens out again when they scroll up
+    var fabExpanded by remember { mutableStateOf(true) }
+    LaunchedEffect(section) { fabExpanded = true }   // a new tab starts at its top, with the full button
+    val shrinkFabOnScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -1f) fabExpanded = false
+                else if (available.y > 1f) fabExpanded = true
+                return Offset.Zero
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             if (!isTv) TopAppBar(
@@ -787,8 +800,9 @@ private fun HomeScreen(
         floatingActionButton = {
             if (!isTv) {
                 ExtendedFloatingActionButton(
+                    expanded = fabExpanded,
                     onClick = { dialog = HomeDialog.AddPlaylist() },
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Add, contentDescription = if (fabExpanded) null else "Add playlist") },
                     text = { Text("Add playlist", fontWeight = FontWeight.SemiBold) },
                     containerColor = Amber,
                     contentColor = FocusInk,
@@ -911,7 +925,7 @@ private fun HomeScreen(
                 }
             }
 
-            Column(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnScroll).then(swipeToTab)) {
+            Column(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnScroll).nestedScroll(shrinkFabOnScroll).then(swipeToTab)) {
             if (section == Section.Playlists) {
                 PlaylistsPane(
                     sources = sources,

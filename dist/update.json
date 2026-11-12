@@ -1,6 +1,6 @@
 {
-  "versionCode": 86,
-  "versionName": "3.65",
+  "versionCode": 87,
+  "versionName": "3.66",
   "apk": "StreamDesk.apk",
-  "notes": "Phone: the app's logo in the top bar, and a floating Add playlist button at the bottom"
+  "notes": "Phone: the Add playlist button shrinks to + while you scroll the channels"
 }

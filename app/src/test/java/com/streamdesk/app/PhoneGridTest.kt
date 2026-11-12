@@ -9,6 +9,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -55,6 +59,15 @@ class PhoneGridTest {
             }
             compose.onNodeWithContentDescription("Show as list").performClick(); settle()
             assertFalse(PhoneView.isGrid(context))
+
+            // Scrolling the channels down shrinks Add playlist to just +, scrolling back up opens it out again
+            compose.onNodeWithText("All").performClick(); settle()
+            compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertExists()
+            compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.4f) }; settle()
+            compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithContentDescription("Add playlist").assertExists()
+            compose.onRoot().performTouchInput { swipeDown(startY = bottom * 0.4f, endY = bottom * 0.8f) }; settle()
+            compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertExists()
         }
     }
 }
