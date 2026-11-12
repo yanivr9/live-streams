@@ -655,6 +655,8 @@ private fun HomeScreen(
 
     // On a TV the remote needs something selected from the start: the first channel
     val isTv = LocalIsTv.current
+    // Back on ☰ → My playlists returns to the channels
+    BackHandler(enabled = !isTv && section == Section.Playlists && !searchOpen) { section = Section.Sport }
     val firstRowFocus = remember { FocusRequester() }
     // TV remote: the channel grid has its own selection (see HomeKeys); the tabs and buttons use Android's focus
     var tvInGrid by remember { mutableStateOf(true) }
@@ -663,6 +665,8 @@ private fun HomeScreen(
     var tvOkDown by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val tvTabs = remember { listOf(Section.Sport, Section.Israel, Section.Favorites, Section.All) }
+    // The phone's tabs; the playlists are in ☰ → My playlists
+    val phoneTabs = remember { listOf(Section.All, Section.Sport, Section.Israel, Section.Favorites) }
     val tabRequesters = remember { List(tvTabs.size) { FocusRequester() } }
     LaunchedEffect(section, group, sourceFilter, query) { tvSelected = 0; tvInGrid = true }
 
@@ -936,17 +940,19 @@ private fun HomeScreen(
                         onDragStart = { scope.launch { dragX.stop() } },
                         onDragEnd = {
                             scope.launch {
-                                val last = Section.entries.lastIndex
+                                val last = phoneTabs.lastIndex
+                                val at = phoneTabs.indexOf(section)   // -1 on My playlists: no swiping there
                                 val dir = when {
-                                    dragX.value <= -paneWidth * 0.2f && section.ordinal < last -> 1    // finger moved left: the next tab
-                                    dragX.value >= paneWidth * 0.2f && section.ordinal > 0 -> -1
+                                    at < 0 -> 0
+                                    dragX.value <= -paneWidth * 0.2f && at < last -> 1    // finger moved left: the next tab
+                                    dragX.value >= paneWidth * 0.2f && at > 0 -> -1
                                     else -> 0
                                 }
                                 if (dir == 0) {
                                     dragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                                 } else {
                                     dragX.animateTo(-dir * paneWidth, tween(140))        // the old tab slides out…
-                                    section = Section.entries[section.ordinal + dir]
+                                    section = phoneTabs[at + dir]
                                     dragX.snapTo(dir * paneWidth)
                                     dragX.animateTo(0f, tween(200))                      // …and the new one slides in
                                 }
@@ -956,7 +962,7 @@ private fun HomeScreen(
                     ) { change, dragAmount ->
                         change.consume()
                         // A little resistance past the first or last tab
-                        val atEdge = (dragAmount > 0 && section.ordinal == 0) || (dragAmount < 0 && section.ordinal == Section.entries.lastIndex)
+                        val atEdge = phoneTabs.indexOf(section).let { at -> at < 0 || (dragAmount > 0 && at == 0) || (dragAmount < 0 && at == phoneTabs.lastIndex) }
                         scope.launch { dragX.snapTo(dragX.value + if (atEdge) dragAmount * 0.3f else dragAmount) }
                     }
                 }
@@ -1014,14 +1020,21 @@ private fun HomeScreen(
                     FormatPicker(format, onPick = { format = it }, modifier = Modifier.padding(horizontal = 8.dp))
                 }
 
-                if (!isTv) {
+                if (!isTv && section == Section.Playlists) {
+                    // ☰ → My playlists: a title with a way back to the channels instead of the tabs
+                    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { section = Section.Sport }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to the channels") }
+                        Text("My playlists", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                } else if (!isTv) {
         // Scrolls when the labels don't fit, e.g. with large text sizes
                     ScrollableTabRow(
-                        selectedTabIndex = section.ordinal,
+                        selectedTabIndex = phoneTabs.indexOf(section).coerceAtLeast(0),
                         containerColor = MaterialTheme.colorScheme.background,
                         edgePadding = 8.dp,
                     ) {
-                        Section.entries.forEach { s ->
+                        phoneTabs.forEach { s ->
                             Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
                         }
                     }

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -19,7 +20,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** Two accounts: the round selector on the Playlists tab picks the one whose channels show; the other is turned off. */
+/** Two accounts: the round selector in ☰ → My playlists picks the one whose channels show; the other is turned off. */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port")
 class ActiveAccountTest {
@@ -40,7 +41,11 @@ class ActiveAccountTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             fun settle() = compose.waitForIdle()
             settle()
-            compose.onNodeWithText("Playlists").performScrollTo().performClick(); settle()
+            // No Playlists tab any more: the playlists open from ☰ → My playlists
+            compose.onNodeWithText("Playlists").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Menu").performClick(); settle()
+            compose.onNodeWithText("My playlists").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()   // (the drawer's rounded edge blocks simulated finger taps)
+            compose.onNodeWithContentDescription("Back to the channels").assertExists()
             compose.onNodeWithContentDescription("Use Friend").performClick(); settle()
             val saved = ChannelStore.get(context).sources.value.associate { it.name to it.enabled }
             assertEquals(mapOf("Test account" to false, "Friend" to true), saved)
