@@ -1,6 +1,6 @@
 {
-  "versionCode": 88,
-  "versionName": "3.67",
+  "versionCode": 89,
+  "versionName": "3.68",
   "apk": "StreamDesk.apk",
-  "notes": "Share an account with a QR code: Playlists → ⋮ → Share with QR code; on the other phone + Add playlist → QR code"
+  "notes": "Phone: search is now a glass button at the top that opens into a glass search bar"
 }

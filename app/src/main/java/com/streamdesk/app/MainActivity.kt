@@ -73,6 +73,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.geometry.Offset
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -356,6 +357,10 @@ private fun HomeScreen(
     // Opens on the sport channels when there are any, otherwise on the full list
     var section by rememberSaveable { mutableStateOf(if (channels.any { it.isSport() }) Section.Sport else Section.All) }
     var query by rememberSaveable { mutableStateOf("") }
+    // Phone: search is a glass button in the top bar that opens into a glass search bar
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    val searchFocus = remember { FocusRequester() }
+    BackHandler(enabled = searchOpen) { query = ""; searchOpen = false }
     var group by rememberSaveable { mutableStateOf<String?>(null) }
     var sourceFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var kindFilter by rememberSaveable { mutableStateOf<KindFilter?>(null) }
@@ -698,6 +703,11 @@ private fun HomeScreen(
                         }
                     }
                     if (!LocalIsTv.current) {
+                        GlassButton(onClick = { searchOpen = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search channels", tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                    if (!LocalIsTv.current) {
                         // List or grid: the icon shows the view a tap switches to
                         IconButton(onClick = { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
                             if (phoneGrid) Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Show as list", tint = Amber)
@@ -806,7 +816,18 @@ private fun HomeScreen(
 
     Scaffold(
         topBar = {
-            if (!isTv) TopAppBar(
+            if (!isTv && searchOpen) TopAppBar(
+                title = {
+                    GlassSearchField(
+                        value = query,
+                        onValueChange = { query = it },
+                        onClose = { query = ""; searchOpen = false },
+                        focusRequester = searchFocus,
+                        modifier = Modifier.padding(end = 12.dp),
+                    )
+                    LaunchedEffect(Unit) { searchFocus.requestFocus() }
+                },
+            ) else if (!isTv) TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // The app's logo (the same as on the loading screen), on a small rounded tile
@@ -978,17 +999,12 @@ private fun HomeScreen(
                 return@Column
             }
 
-            if (!isTv) {
-            OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
-                    singleLine = true,
-                    placeholder = { Text("Search channels") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = if (query.isNotEmpty()) {
-                        { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, contentDescription = "Clear search") } }
-                    } else null,
+            if (!isTv && query.isNotBlank()) {
+                Text(
+                    if (visible.size == 1) "1 channel" else "${visible.size} channels",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                 )
             }
             if (!isTv && kindsPresent.size > 1) {
@@ -1101,7 +1117,7 @@ private fun HomeScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 108.dp),
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 96.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {

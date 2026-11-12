@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.swipeDown
@@ -68,6 +70,15 @@ class PhoneGridTest {
             compose.onNodeWithContentDescription("Add playlist").assertExists()
             compose.onRoot().performTouchInput { swipeDown(startY = bottom * 0.4f, endY = bottom * 0.8f) }; settle()
             compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertExists()
+
+            // Search: the glass button opens the glass bar, typing filters, ✕ closes it and shows everything again
+            compose.onNodeWithContentDescription("Search channels").performClick(); settle()
+            compose.onNode(hasSetTextAction()).performTextInput("Sport 5"); settle()
+            compose.onNodeWithText("2 channels").assertExists()   // Sport 5 in Full HD and 4K
+            compose.onNodeWithText("Channel 13").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Close search").performClick(); settle()
+            compose.onNodeWithContentDescription("Search channels").assertExists()
+            compose.onNodeWithText("2 channels").assertDoesNotExist()   // the filter is cleared
         }
     }
 }
