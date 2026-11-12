@@ -48,7 +48,7 @@ abstract class QaShotsBase {
             PhoneView.setGrid(context, false)
             shot("1-list")
             compose.onNodeWithContentDescription("Show as grid").performClick(); shot("2-grid")
-            compose.onNodeWithText("Israeli TV").performClick(); shot("3-israeli-grid")
+            compose.tab("Israeli TV").performClick(); shot("3-israeli-grid")
             compose.onNodeWithContentDescription("Search channels").performClick(); shot("4-search-open")
             compose.onNode(hasSetTextAction()).performTextInput("Channel 1"); shot("5-search-typed")
             compose.onNodeWithContentDescription("Close search").performClick(); shot("6-search-closed")

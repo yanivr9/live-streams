@@ -50,7 +50,7 @@ class PhoneGridTest {
             fun settle() { compose.mainClock.advanceTimeBy(2_000); shadowOf(android.os.Looper.getMainLooper()).idle() }
             settle()
             compose.onAllNodesWithText("Recent").assertCountEquals(0)   // the phone has no Recent tab
-            compose.onNodeWithText("Sport").performClick(); settle()
+            compose.tab("Sport").performClick(); settle()
             compose.onNodeWithContentDescription("Show as grid").performClick(); settle()
             assertTrue(PhoneView.isGrid(context))
             compose.onNodeWithContentDescription("Show as list").assertExists()
@@ -66,14 +66,9 @@ class PhoneGridTest {
             compose.onNodeWithContentDescription("Show as list").performClick(); settle()
             assertFalse(PhoneView.isGrid(context))
 
-            // Scrolling the channels down shrinks Add playlist to just +, scrolling back up opens it out again
-            compose.onNodeWithText("All").performClick(); settle()
-            compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertExists()
-            compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.4f) }; settle()
-            compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertDoesNotExist()
+            // The floating + opens Add playlist
+            compose.tab("All").performClick(); settle()
             compose.onNodeWithContentDescription("Add playlist").assertExists()
-            compose.onRoot().performTouchInput { swipeDown(startY = bottom * 0.4f, endY = bottom * 0.8f) }; settle()
-            compose.onNodeWithText("Add playlist", useUnmergedTree = true).assertExists()
 
             // Search: the glass button opens the glass bar, typing filters, ✕ closes it and shows everything again
             compose.onNodeWithContentDescription("Search channels").performClick(); settle()
@@ -98,7 +93,7 @@ class PhoneGridTest {
                     File(dir, "phone-drawer.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 }
             }
-            compose.onNodeWithText("Israeli TV", useUnmergedTree = true).let { compose.onAllNodesWithText("Israeli TV")[1].performClick() }; settle()
+            compose.onAllNodes(androidx.compose.ui.test.hasText("Israeli TV") and androidx.compose.ui.test.hasClickAction())[0].performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
             compose.onNodeWithText("Share account with QR code").assertDoesNotExist()   // closed again
         }
     }

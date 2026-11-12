@@ -86,7 +86,7 @@ class CompatMatrixTest(private val name: String, private val qualifiers: String,
             sc.onActivity { assertTrue(it.isTelevision() == tv) }
             compose.onAllNodesWithText("Sport 1")[0].assertExists()
             shot("1-sport")
-            compose.onNodeWithText("Israeli TV").performScrollToIfPhone(tv).performClick(); settle()
+            compose.tab("Israeli TV").performClick(); settle()
             compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists()
             shot("2-israeli")
         }
@@ -111,7 +111,7 @@ abstract class AndroidVersionBase {
             compose.mainClock.advanceTimeBy(1_000)
             shadowOf(android.os.Looper.getMainLooper()).idle()
             compose.onAllNodesWithText("Sport 1")[0].assertExists()
-            compose.onNodeWithText("Israeli TV").performClick()
+            compose.tab("Israeli TV").performClick()
             compose.mainClock.advanceTimeBy(800)
             compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists()
         }

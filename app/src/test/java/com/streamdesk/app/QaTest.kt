@@ -80,7 +80,7 @@ class QaPhoneTest {
             fun swipeLeft() { compose.onRoot().performTouchInput { swipeLeft(startX = width * 0.9f, endX = width * 0.1f, durationMillis = 300) }; compose.mainClock.advanceTimeBy(1_000) }
             fun swipeRight() { compose.onRoot().performTouchInput { swipeRight(startX = width * 0.1f, endX = width * 0.9f, durationMillis = 300) }; compose.mainClock.advanceTimeBy(1_000) }
             shot("00-start")
-            compose.onNodeWithText("Israeli TV").performClick(); compose.mainClock.advanceTimeBy(500); shot("01-israeli")
+            compose.tab("Israeli TV").performClick(); compose.mainClock.advanceTimeBy(500); shot("01-israeli")
             repeat(3) { swipeUp() }; shot("02-israeli-scrolled3")
             repeat(10) { swipeUp() }; shot("03-israeli-scrolled13")
             repeat(60) { swipeUp() }; shot("04-israeli-bottom")

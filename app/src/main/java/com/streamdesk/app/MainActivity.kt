@@ -107,6 +107,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBar
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.RadioButtonDefaults
@@ -666,7 +671,7 @@ private fun HomeScreen(
     val focusManager = LocalFocusManager.current
     val tvTabs = remember { listOf(Section.Sport, Section.Israel, Section.Favorites, Section.All) }
     // The phone's tabs; the playlists are in ☰ → My playlists
-    val phoneTabs = remember { listOf(Section.All, Section.Sport, Section.Israel, Section.Favorites) }
+    val phoneTabs = remember { listOf(Section.Sport, Section.Israel, Section.Favorites, Section.All) }
     val tabRequesters = remember { List(tvTabs.size) { FocusRequester() } }
     LaunchedEffect(section, group, sourceFilter, query) { tvSelected = 0; tvInGrid = true }
 
@@ -903,16 +908,31 @@ private fun HomeScreen(
                 )
             },
             snackbarHost = { SnackbarHost(snackbar) },
+            // Phone: the tabs live at the bottom, with icons (the TV keeps its tab bar at the top)
+            bottomBar = {
+                if (!isTv) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                    phoneTabs.forEach { s ->
+                        NavigationBarItem(
+                            selected = section == s,
+                            onClick = { section = s; sourceFilter = null; group = null },
+                            icon = { Icon(s.icon(), contentDescription = null) },
+                            label = { Text(s.label, maxLines = 1, softWrap = false) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Amber,
+                                selectedTextColor = Amber,
+                                indicatorColor = Amber.copy(alpha = 0.18f),
+                            ),
+                        )
+                    }
+                }
+            },
             floatingActionButton = {
-                if (!isTv && section != Section.Playlists) {   // the Playlists tab has its own big Add button
-                    ExtendedFloatingActionButton(
-                        expanded = fabExpanded,
+                if (!isTv && section != Section.Playlists) {   // My playlists has its own big Add button
+                    FloatingActionButton(
                         onClick = { dialog = HomeDialog.AddPlaylist() },
-                        icon = { Icon(Icons.Default.Add, contentDescription = if (fabExpanded) null else "Add playlist") },
-                        text = { Text("Add playlist", fontWeight = FontWeight.SemiBold) },
                         containerColor = Amber,
                         contentColor = FocusInk,
-                    )
+                    ) { Icon(Icons.Default.Add, contentDescription = "Add playlist") }
                 }
             },
         ) { padding ->
@@ -1028,15 +1048,16 @@ private fun HomeScreen(
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 } else if (!isTv) {
-        // Scrolls when the labels don't fit, e.g. with large text sizes
-                    ScrollableTabRow(
-                        selectedTabIndex = phoneTabs.indexOf(section).coerceAtLeast(0),
-                        containerColor = MaterialTheme.colorScheme.background,
-                        edgePadding = 8.dp,
-                    ) {
-                        phoneTabs.forEach { s ->
-                            Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
-                        }
+                    // Where you are: the tab's name and how many channels it shows (after a search, how many matched)
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp), verticalAlignment = Alignment.Bottom) {
+                        Text(section.label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (visible.size == 1) "1 channel" else "%,d channels".format(visible.size),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 2.dp),
+                        )
                     }
                 }
 
@@ -1067,14 +1088,6 @@ private fun HomeScreen(
                     return@Column
                 }
 
-                if (!isTv && query.isNotBlank()) {
-                    Text(
-                        if (visible.size == 1) "1 channel" else "${visible.size} channels",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                    )
-                }
                 if (!isTv && kindsPresent.size > 1) {
                     LazyRow(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
@@ -2375,3 +2388,12 @@ private fun SportListEditor(initial: SportSettings, onDismiss: () -> Unit, onSav
 private fun updatedAgo(at: Long): String =
     if (System.currentTimeMillis() - at < 60_000) "just now"
     else DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+
+/** The bottom bar's icon for each tab. */
+private fun Section.icon(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {
+    Section.Sport -> Icons.Default.SportsSoccer
+    Section.Israel -> Icons.Default.Tv
+    Section.Favorites -> Icons.Default.Star
+    Section.All -> Icons.Default.Apps
+    Section.Playlists -> Icons.AutoMirrored.Filled.PlaylistPlay
+}

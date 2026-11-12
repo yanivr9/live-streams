@@ -56,11 +56,11 @@ class PhoneScreensTest {
             compose.onAllNodesWithText("Sport 5")[0].assertExists()
             scenario.onActivity { assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, it.requestedOrientation) }
 
-            compose.onNodeWithText("Israeli TV").performScrollTo().performClick()
+            compose.tab("Israeli TV").performClick()
             compose.waitForIdle()
             compose.onAllNodesWithText("Channel 12 · Keshet")[0].assertExists()
 
-            compose.onNodeWithText("All").performScrollTo().performClick()   // the tab bar may have scrolled it out of view
+            compose.tab("All").performClick()   // the tab bar may have scrolled it out of view
             compose.waitForIdle()
             compose.onAllNodesWithText("YES SPORT 1 FHD")[0].assertExists()
             // Scrolling down the list, like a finger would
@@ -89,8 +89,8 @@ class PhoneScreensTest {
     fun addingChannelsOpensWithBothChoices() {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()
-            // The floating "Add playlist" button goes straight to the Add channels window
-            compose.onNodeWithText("Add playlist", useUnmergedTree = true).performClick()
+            // The floating + goes straight to the Add channels window
+            compose.onNodeWithContentDescription("Add playlist").performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Login").assertExists()
             compose.onNodeWithText("Link").assertExists()
@@ -188,7 +188,7 @@ class TvScreensTest {
             compose.onAllNodesWithText("Sport 1")[0].assertExists()
             // The TV's tabs: Sport, Israeli TV, Favorites, All (no Recent or Playlists)
             compose.onAllNodesWithText("Recent").assertCountEquals(0)
-            compose.onNodeWithText("Israeli TV").performClick()
+            compose.tab("Israeli TV").performClick()
             compose.waitForIdle()
             compose.onAllNodesWithText("Channel 13 · Reshet")[0].assertExists()
             compose.onNodeWithContentDescription("More options").performClick()
@@ -215,3 +215,7 @@ internal fun seedChannels(context: Context) {
     File(context.filesDir, "playlists.json").writeText(JSONArray().put(source.toJson()).toString())
     File(context.filesDir, "recent.json").delete()
 }
+
+/** A tab, at the bottom on a phone or at the top on a TV: the tappable one (a phone also shows the tab's name as a title). */
+internal fun androidx.compose.ui.test.SemanticsNodeInteractionsProvider.tab(name: String) =
+    onAllNodes(androidx.compose.ui.test.hasText(name) and androidx.compose.ui.test.hasClickAction())[0]
