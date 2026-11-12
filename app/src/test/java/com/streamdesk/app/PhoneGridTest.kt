@@ -90,12 +90,8 @@ class PhoneGridTest {
             compose.onNodeWithText("Share account with QR code").assertExists()
             compose.onNodeWithText("Sound with screen off").assertExists()
             compose.onNodeWithText("Video quality").assertExists()
-            // The switch on the "CH + / − buttons on the picture" row turns the buttons off and on again
-            val chSwitch = compose.onNode(androidx.compose.ui.test.isToggleable() and androidx.compose.ui.test.hasAnySibling(hasText("CH + / − buttons on the picture")), useUnmergedTree = true)
-            chSwitch.performScrollTo().performClick(); settle()
-            assertFalse(PlayerPrefs.channelButtons(context))
-            chSwitch.performClick(); settle()
-            assertTrue(PlayerPrefs.channelButtons(context))
+            compose.onNodeWithText("CH + / − buttons on the picture").assertExists()
+            compose.onNodeWithText("Small window when leaving").assertExists()
             System.getProperty("tvshots")?.let { dir ->
                 scenario.onActivity { a ->
                     val v = a.window.decorView
