@@ -1,6 +1,6 @@
 {
-  "versionCode": 93,
-  "versionName": "3.72",
+  "versionCode": 94,
+  "versionName": "3.73",
   "apk": "StreamDesk.apk",
-  "notes": "TV guide works again on accounts saved as https:// on a plain-http port (8080)"
+  "notes": "The app is now called Livio (same app, same settings)"
 }
