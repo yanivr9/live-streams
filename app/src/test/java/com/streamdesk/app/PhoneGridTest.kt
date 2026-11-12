@@ -93,7 +93,7 @@ class PhoneGridTest {
                     File(dir, "phone-drawer.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 }
             }
-            compose.onAllNodes(androidx.compose.ui.test.hasText("Israeli TV") and androidx.compose.ui.test.hasClickAction())[0].performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
+            compose.onNode(androidx.compose.ui.test.hasText("Israeli TV") and androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button)).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()   // the menu's line, not the bottom bar's tab
             compose.onNodeWithText("Share account with QR code").assertDoesNotExist()   // closed again
         }
     }
