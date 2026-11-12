@@ -1,6 +1,6 @@
 {
-  "versionCode": 94,
-  "versionName": "3.73",
+  "versionCode": 95,
+  "versionName": "3.74",
   "apk": "StreamDesk.apk",
-  "notes": "The app is now called Livio (same app, same settings)"
+  "notes": "Bug fixes: TV guide on https-saved accounts, 3 grid cards on small phones, settings lines, 'updated just now'"
 }
