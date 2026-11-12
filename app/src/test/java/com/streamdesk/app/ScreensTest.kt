@@ -73,8 +73,8 @@ class PhoneScreensTest {
             compose.waitForIdle()
             compose.onAllNodesWithText("HOT Cinema")[0].assertExists()   // still scrolled to where it was
 
-            // The menu and the problem report
-            compose.onNodeWithContentDescription("More options").performClick()
+            // The side menu (☰) and the problem report
+            compose.onNodeWithContentDescription("Menu").performClick()
             compose.waitForIdle()
             // (Taps don't reach pop-up windows in this simulator, so the entry is pressed directly)
             compose.onNodeWithText("Send problem report").performSemanticsAction(SemanticsActions.OnClick)

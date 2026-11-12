@@ -87,7 +87,7 @@ class QaPhoneTest {
             repeat(80) { compose.onRoot().performTouchInput { swipeDown(startY = height * 0.2f, endY = height * 0.85f, durationMillis = 200) }; compose.mainClock.advanceTimeBy(500) }; shot("05-israeli-top")
             swipeLeft(); shot("06-swipe-left")
             swipeRight(); swipeRight(); shot("07-swipe-right-twice")
-            compose.onNodeWithContentDescription("More options").performClick(); shot("08-menu")
+            compose.onNodeWithContentDescription("Menu").performClick(); shot("08-menu")
         }
     }
 }

@@ -107,6 +107,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.PhonelinkRing
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
@@ -303,6 +319,7 @@ private sealed interface HomeDialog {
     data class Series(val series: Channel) : HomeDialog
     data class Crash(val report: String) : HomeDialog
     data object Logs : HomeDialog
+    data object About : HomeDialog
     data object EditSport : HomeDialog
     data object LinkPhone : HomeDialog
     data object Search : HomeDialog
@@ -722,7 +739,7 @@ private fun HomeScreen(
                             }
                         }
                     }
-                    Box {
+                    if (LocalIsTv.current) Box {
                         IconButton(onClick = { moreMenu = true }, modifier = Modifier.tvFocusRing()) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
@@ -814,387 +831,472 @@ private fun HomeScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (!isTv && searchOpen) TopAppBar(
-                title = {
-                    GlassSearchField(
-                        value = query,
-                        onValueChange = { query = it },
-                        onClose = { query = ""; searchOpen = false },
-                        focusRequester = searchFocus,
-                        modifier = Modifier.padding(end = 12.dp),
-                    )
-                    LaunchedEffect(Unit) { searchFocus.requestFocus() }
-                },
-            ) else if (!isTv) TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // The app's logo (the same as on the loading screen), on a small rounded tile
-                        Box(
-                            Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Image(painterResource(R.drawable.splash_icon), contentDescription = "Stream Desk logo", modifier = Modifier.requiredSize(58.dp))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Text("Stream Desk", fontWeight = FontWeight.SemiBold)
-                    }
-                },
-                actions = topActions,
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = {
-            if (!isTv) {
-                ExtendedFloatingActionButton(
-                    expanded = fabExpanded,
-                    onClick = { dialog = HomeDialog.AddPlaylist() },
-                    icon = { Icon(Icons.Default.Add, contentDescription = if (fabExpanded) null else "Add playlist") },
-                    text = { Text("Add playlist", fontWeight = FontWeight.SemiBold) },
-                    containerColor = Amber,
-                    contentColor = FocusInk,
-                )
-            }
-        },
-    ) { padding ->
-        // Scrolling the channels with a finger closes the keyboard (for example after typing in the search box)
-        val keyboard = LocalSoftwareKeyboardController.current
-        val focusManager = LocalFocusManager.current
-        val hideKeyboardOnScroll = remember(keyboard, focusManager) {
-            object : NestedScrollConnection {
-                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    if (source == NestedScrollSource.UserInput && available.y != 0f) {
-                        keyboard?.hide()
-                        focusManager.clearFocus()
-                    }
-                    return Offset.Zero
-                }
-            }
-        }
-        // On a phone, the channels follow your finger as you drag left or right; when you let go, the next or previous tab opens
-        val dragX = remember { Animatable(0f) }
-        var paneWidth by remember { mutableFloatStateOf(1f) }
-        val swipeToTab = if (isTv) Modifier else Modifier
-            .onSizeChanged { paneWidth = it.width.toFloat().coerceAtLeast(1f) }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { scope.launch { dragX.stop() } },
-                    onDragEnd = {
-                        scope.launch {
-                            val last = Section.entries.lastIndex
-                            val dir = when {
-                                dragX.value <= -paneWidth * 0.2f && section.ordinal < last -> 1    // finger moved left: the next tab
-                                dragX.value >= paneWidth * 0.2f && section.ordinal > 0 -> -1
-                                else -> 0
+    // Phone: ☰ opens a side menu with the channels, sharing, settings and help (the TV keeps its ⋮ menu)
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    fun closeDrawer() { scope.launch { drawerState.close() } }
+    val xtreamSources = sources.filter { it.xtream != null }
+    val mainAccount = sources.firstOrNull { it.enabled } ?: sources.firstOrNull()
+    val appVersion = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
+    val homeScaffold: @Composable () -> Unit = {
+        Scaffold(
+            topBar = {
+                if (!isTv && searchOpen) TopAppBar(
+                    title = {
+                        GlassSearchField(
+                            value = query,
+                            onValueChange = { query = it },
+                            onClose = { query = ""; searchOpen = false },
+                            focusRequester = searchFocus,
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
+                        LaunchedEffect(Unit) { searchFocus.requestFocus() }
+                    },
+                ) else if (!isTv) TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = "Menu") }
+                    },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // The app's logo (the same as on the loading screen), on a small rounded tile
+                            Box(
+                                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Image(painterResource(R.drawable.splash_icon), contentDescription = "Stream Desk logo", modifier = Modifier.requiredSize(58.dp))
                             }
-                            if (dir == 0) {
-                                dragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-                            } else {
-                                dragX.animateTo(-dir * paneWidth, tween(140))        // the old tab slides out…
-                                section = Section.entries[section.ordinal + dir]
-                                dragX.snapTo(dir * paneWidth)
-                                dragX.animateTo(0f, tween(200))                      // …and the new one slides in
-                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text("Stream Desk", fontWeight = FontWeight.SemiBold)
                         }
                     },
-                    onDragCancel = { scope.launch { dragX.animateTo(0f) } },
-                ) { change, dragAmount ->
-                    change.consume()
-                    // A little resistance past the first or last tab
-                    val atEdge = (dragAmount > 0 && section.ordinal == 0) || (dragAmount < 0 && section.ordinal == Section.entries.lastIndex)
-                    scope.launch { dragX.snapTo(dragX.value + if (atEdge) dragAmount * 0.3f else dragAmount) }
-                }
-            }
-            .graphicsLayer { translationX = dragX.value }
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            if (isTv) {
-                // Just the red dot, not the name: the TV's width is needed for all the tabs
-                // The TV's tabs: Sport first, as it is what the TV is mostly used for
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.size(10.dp).background(OnAir, CircleShape))
-                    Spacer(Modifier.width(12.dp))
-                    TvTabBar(
-                        labels = tvTabs.map { it.label },
-                        selected = tvTabs.indexOf(section),
-                        // OK on a tab opens it and goes down into its channels
-                        onSelect = { section = tvTabs[it]; tvInGrid = true; focusManager.clearFocus() },
-                        modifier = Modifier.weight(1f),
-                        requesters = tabRequesters,
-                    )
-                    IconButton(onClick = { dialog = HomeDialog.Search }, modifier = Modifier.tvFocusRing()) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
-                    topActions()
-                }
-            }
-            if (isTv && sources.isEmpty()) {
-                LinkPhoneCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-            if (showLinkBar) {
-                // Open network stream (or a playlist link)
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        placeholder = { Text("Stream or playlist link") },
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                        keyboardActions = KeyboardActions(onGo = { submitUrl() }),
-                        trailingIcon = if (url.isNotEmpty()) {
-                            { IconButton(onClick = { url = "" }) { Icon(Icons.Default.Close, contentDescription = "Clear") } }
-                        } else null,
-                    )
-                    FilledIconButton(onClick = ::submitUrl, enabled = !checkingLink, modifier = Modifier.size(52.dp)) {
-                        if (checkingLink) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.PlayArrow, contentDescription = "Open")
-                    }
-                }
-                FormatPicker(format, onPick = { format = it }, modifier = Modifier.padding(horizontal = 8.dp))
-            }
-
-            if (!isTv) {
-    // Scrolls when the labels don't fit, e.g. with large text sizes
-                ScrollableTabRow(
-                    selectedTabIndex = section.ordinal,
-                    containerColor = MaterialTheme.colorScheme.background,
-                    edgePadding = 8.dp,
-                ) {
-                    Section.entries.forEach { s ->
-                        Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
-                    }
-                }
-            }
-
-            Column(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnScroll).nestedScroll(shrinkFabOnScroll).then(swipeToTab)) {
-            if (section == Section.Playlists) {
-                PlaylistsPane(
-                    sources = sources,
-                    progress = progress,
-                    onAdd = { dialog = HomeDialog.AddPlaylist() },
-                    onRefresh = { loadPlaylist(it.url) },
-                    onShow = {
-                        section = Section.All
-                        sourceFilter = it.url
-                        group = null
-                    },
-                    onRename = {
-                        dialog = if (it.xtream != null) HomeDialog.EditLogin(it, null) else HomeDialog.RenamePlaylist(it)
-                    },
-                    onToggle = { store.setEnabled(it.url, !it.enabled) },
-                    onLogs = { dialog = HomeDialog.Logs },
-                    onSendLogin = if (isTv) null else { source -> dialog = HomeDialog.PickTv(TvJob.Login(source)) },
-                    onShareQr = if (isTv) null else { source -> dialog = HomeDialog.ShareQr(source) },
-                    onCopy = { clipboard.setText(AnnotatedString(it.url)); notify("Link copied.") },
-                    onRemove = { dialog = HomeDialog.RemovePlaylist(it) },
-                    modifier = Modifier.weight(1f),
+                    actions = topActions,
                 )
-                return@Column
-            }
-
-            if (!isTv && query.isNotBlank()) {
-                Text(
-                    if (visible.size == 1) "1 channel" else "${visible.size} channels",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                )
-            }
-            if (!isTv && kindsPresent.size > 1) {
-                LazyRow(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(kindsPresent) { k ->
-                        FilterChip(
-                            selected = kindFilter == k,
-                            onClick = { kindFilter = if (kindFilter == k) null else k; group = null },
-                            label = { Text(k.label) },
-                        )
-                    }
+            },
+            snackbarHost = { SnackbarHost(snackbar) },
+            floatingActionButton = {
+                if (!isTv) {
+                    ExtendedFloatingActionButton(
+                        expanded = fabExpanded,
+                        onClick = { dialog = HomeDialog.AddPlaylist() },
+                        icon = { Icon(Icons.Default.Add, contentDescription = if (fabExpanded) null else "Add playlist") },
+                        text = { Text("Add playlist", fontWeight = FontWeight.SemiBold) },
+                        containerColor = Amber,
+                        contentColor = FocusInk,
+                    )
                 }
-            }
-            val showSourceChip = section == Section.All && filterName != null
-            if (groups.isNotEmpty() || showSourceChip || (isTv && query.isNotBlank())) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (isTv && query.isNotBlank()) item {
-                        FilterChip(
-                            selected = true,
-                            onClick = { query = "" },
-                            label = { Text("Search: $query", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp)) },
-                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(16.dp)) },
-                        )
-                    }
-                    if (showSourceChip) item {
-                        FilterChip(
-                            selected = true,
-                            onClick = { sourceFilter = null; group = null },
-                            label = { Text(filterName.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp)) },
-                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Show all channels", modifier = Modifier.size(16.dp)) },
-                        )
-                    }
-                    if (groups.isNotEmpty()) {
-                        item { FilterChip(selected = group == null, onClick = { group = null }, label = { Text("All groups") }) }
-                        items(groups) { g ->
-                            FilterChip(selected = group == g, onClick = { group = if (group == g) null else g }, label = { Text(g) })
+            },
+        ) { padding ->
+            // Scrolling the channels with a finger closes the keyboard (for example after typing in the search box)
+            val keyboard = LocalSoftwareKeyboardController.current
+            val focusManager = LocalFocusManager.current
+            val hideKeyboardOnScroll = remember(keyboard, focusManager) {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                            keyboard?.hide()
+                            focusManager.clearFocus()
                         }
+                        return Offset.Zero
                     }
                 }
             }
-
-            if (visible.isEmpty()) {
-                EmptyState(section, filtered = query.isNotBlank() || group != null)
-            } else if (isTv) {
-                // The tiles are sized so exactly [tileCount] fit on the screen: the rows share the height
-                BoxWithConstraints(Modifier.weight(1f)) {
-                    val gap = 12.dp
-                    // The rows share the height exactly, leaving 8 dp at the bottom (less than the gap), so the next row never peeks in
-                    val rowHeight = ((maxHeight - 8.dp - 8.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
-                // Each tab (and folder) opens at its own top, not where the previous tab was scrolled to
-                key(section, group, sourceFilter) {
-                val gridState = rememberLazyGridState()
-                // The grid moves a whole row at a time, keeping the selected row in the middle: the tiles never end up
-                // half off the screen, and the picture doesn't jump by uneven amounts
-                LaunchedEffect(tvSelected, tvInGrid, tileCount) {
-                    if (tvInGrid && visible.isNotEmpty()) {
-                        val columns = tileCount.columns
-                        val row = tvSelected.coerceIn(0, visible.size - 1) / columns
-                        val firstRow = (row - (tileCount.rows - 1) / 2).coerceAtLeast(0)
-                        if (gridState.firstVisibleItemIndex / columns != firstRow || gridState.firstVisibleItemScrollOffset != 0) {
-                            gridState.animateScrollToItem(firstRow * columns)
-                        }
-                    }
-                }
-                LazyVerticalGrid(
-                    state = gridState,
-                    columns = GridCells.Fixed(tileCount.columns),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                ) {
-                    itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
-                        // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
-                        LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
-                        ChannelTile(
-                            modifier = Modifier.height(rowHeight),
-                            selected = tvInGrid && tvSelected.coerceIn(0, visible.size - 1) == i,
-                            menuSignal = tvMenuSignal,
-                            channel = ch,
-                            number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
-                            saved = numbers[ch.url] != null,
-                            onClick = {
-                                if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
-                                else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
-                            },
-                            onToggleFavorite = { store.toggleFavorite(ch) },
-                            onRename = { dialog = HomeDialog.Rename(ch) },
-                            onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
-                            onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
-                            onRemove = { store.remove(ch.url) },
-                            removeLabel = "Delete channel",
-                            onAir = NowNext.of(guides[ch.url], nowSeconds),
-                            onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
-                            fillHeight = true,
-                        )
-                    }
-                }
-                }
-                }
-            } else if (phoneGrid) {
-                // The phone's grid: 3 cards across when held upright, more on a tablet or sideways
-                key(section, group, sourceFilter) {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 108.dp),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 96.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
-                        LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
-                        val saved = numbers[ch.url] != null
-                        val guideLogin = loginFor(ch)
-                        PhoneTile(
-                            channel = ch,
-                            tag = if (section == Section.Sport || section == Section.Israel) ch.group else null,
-                            onAir = NowNext.of(guides[ch.url], nowSeconds),
-                            onClick = {
-                                if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
-                                else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
-                            },
-                            onToggleFavorite = { store.toggleFavorite(ch) },
-                            menuItems = { close ->
-                                if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { close(); dialog = HomeDialog.Rename(ch) })
-                                else AppMenuItem(text = { Text("Save to channels") }, onClick = { close(); store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") })
-                                if (guideLogin != null) AppMenuItem(text = { Text("TV guide") }, onClick = { close(); dialog = HomeDialog.Guide(ch, guideLogin) })
-                                AppMenuItem(text = { Text("Play on TV") }, onClick = {
-                                    close()
-                                    val from = (i - 100).coerceAtLeast(0)
-                                    val to = (i + 100).coerceAtMost(visible.size)
-                                    dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
-                                })
-                                AppMenuItem(text = { Text("Copy link") }, onClick = { close(); clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") })
-                                AppMenuItem(text = { Text("Delete channel") }, onClick = {
-                                    close()
-                                    store.remove(ch.url)
-                                })
-                            },
-                        )
-                    }
-                }
-                }
-            } else {
-                key(section, group, sourceFilter) {
-                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 96.dp)) {
-                    itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
-                        // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
-                        LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
-                        ChannelRow(
-                            modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
-                            channel = ch,
-                            number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
-                            saved = numbers[ch.url] != null,
-                            onClick = {
-                                if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
-                                else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
-                            },
-                            onToggleFavorite = { store.toggleFavorite(ch) },
-                            onRename = { dialog = HomeDialog.Rename(ch) },
-                            onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
-                            onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
-                            onPlayOnTv = if (isTv) null else {
-                                {
-                                    val from = (i - 100).coerceAtLeast(0)
-                                    val to = (i + 100).coerceAtMost(visible.size)
-                                    dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
+            // On a phone, the channels follow your finger as you drag left or right; when you let go, the next or previous tab opens
+            val dragX = remember { Animatable(0f) }
+            var paneWidth by remember { mutableFloatStateOf(1f) }
+            val swipeToTab = if (isTv) Modifier else Modifier
+                .onSizeChanged { paneWidth = it.width.toFloat().coerceAtLeast(1f) }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { scope.launch { dragX.stop() } },
+                        onDragEnd = {
+                            scope.launch {
+                                val last = Section.entries.lastIndex
+                                val dir = when {
+                                    dragX.value <= -paneWidth * 0.2f && section.ordinal < last -> 1    // finger moved left: the next tab
+                                    dragX.value >= paneWidth * 0.2f && section.ordinal > 0 -> -1
+                                    else -> 0
                                 }
-                            },
-                            onRemove = {
-                                store.remove(ch.url)
-                            },
-                            removeLabel = "Delete channel",
-                            onAir = NowNext.of(guides[ch.url], nowSeconds),
-                            onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
+                                if (dir == 0) {
+                                    dragX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                } else {
+                                    dragX.animateTo(-dir * paneWidth, tween(140))        // the old tab slides out…
+                                    section = Section.entries[section.ordinal + dir]
+                                    dragX.snapTo(dir * paneWidth)
+                                    dragX.animateTo(0f, tween(200))                      // …and the new one slides in
+                                }
+                            }
+                        },
+                        onDragCancel = { scope.launch { dragX.animateTo(0f) } },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        // A little resistance past the first or last tab
+                        val atEdge = (dragAmount > 0 && section.ordinal == 0) || (dragAmount < 0 && section.ordinal == Section.entries.lastIndex)
+                        scope.launch { dragX.snapTo(dragX.value + if (atEdge) dragAmount * 0.3f else dragAmount) }
+                    }
+                }
+                .graphicsLayer { translationX = dragX.value }
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                if (isTv) {
+                    // Just the red dot, not the name: the TV's width is needed for all the tabs
+                    // The TV's tabs: Sport first, as it is what the TV is mostly used for
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(10.dp).background(OnAir, CircleShape))
+                        Spacer(Modifier.width(12.dp))
+                        TvTabBar(
+                            labels = tvTabs.map { it.label },
+                            selected = tvTabs.indexOf(section),
+                            // OK on a tab opens it and goes down into its channels
+                            onSelect = { section = tvTabs[it]; tvInGrid = true; focusManager.clearFocus() },
+                            modifier = Modifier.weight(1f),
+                            requesters = tabRequesters,
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        IconButton(onClick = { dialog = HomeDialog.Search }, modifier = Modifier.tvFocusRing()) { Icon(Icons.Default.Search, contentDescription = "Search channels") }
+                        topActions()
+                    }
+                }
+                if (isTv && sources.isEmpty()) {
+                    LinkPhoneCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                }
+                if (showLinkBar) {
+                    // Open network stream (or a playlist link)
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = url,
+                            onValueChange = { url = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("Stream or playlist link") },
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                            keyboardActions = KeyboardActions(onGo = { submitUrl() }),
+                            trailingIcon = if (url.isNotEmpty()) {
+                                { IconButton(onClick = { url = "" }) { Icon(Icons.Default.Close, contentDescription = "Clear") } }
+                            } else null,
+                        )
+                        FilledIconButton(onClick = ::submitUrl, enabled = !checkingLink, modifier = Modifier.size(52.dp)) {
+                            if (checkingLink) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                            else Icon(Icons.Default.PlayArrow, contentDescription = "Open")
+                        }
+                    }
+                    FormatPicker(format, onPick = { format = it }, modifier = Modifier.padding(horizontal = 8.dp))
+                }
+
+                if (!isTv) {
+        // Scrolls when the labels don't fit, e.g. with large text sizes
+                    ScrollableTabRow(
+                        selectedTabIndex = section.ordinal,
+                        containerColor = MaterialTheme.colorScheme.background,
+                        edgePadding = 8.dp,
+                    ) {
+                        Section.entries.forEach { s ->
+                            Tab(selected = section == s, onClick = { section = s }, text = { Text(s.label, maxLines = 1, softWrap = false) })
+                        }
+                    }
+                }
+
+                Column(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnScroll).nestedScroll(shrinkFabOnScroll).then(swipeToTab)) {
+                if (section == Section.Playlists) {
+                    PlaylistsPane(
+                        sources = sources,
+                        progress = progress,
+                        onAdd = { dialog = HomeDialog.AddPlaylist() },
+                        onRefresh = { loadPlaylist(it.url) },
+                        onShow = {
+                            section = Section.All
+                            sourceFilter = it.url
+                            group = null
+                        },
+                        onRename = {
+                            dialog = if (it.xtream != null) HomeDialog.EditLogin(it, null) else HomeDialog.RenamePlaylist(it)
+                        },
+                        onToggle = { store.setEnabled(it.url, !it.enabled) },
+                        onLogs = { dialog = HomeDialog.Logs },
+                        onSendLogin = if (isTv) null else { source -> dialog = HomeDialog.PickTv(TvJob.Login(source)) },
+                        onShareQr = if (isTv) null else { source -> dialog = HomeDialog.ShareQr(source) },
+                        onCopy = { clipboard.setText(AnnotatedString(it.url)); notify("Link copied.") },
+                        onRemove = { dialog = HomeDialog.RemovePlaylist(it) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    return@Column
+                }
+
+                if (!isTv && query.isNotBlank()) {
+                    Text(
+                        if (visible.size == 1) "1 channel" else "${visible.size} channels",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                    )
+                }
+                if (!isTv && kindsPresent.size > 1) {
+                    LazyRow(
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(kindsPresent) { k ->
+                            FilterChip(
+                                selected = kindFilter == k,
+                                onClick = { kindFilter = if (kindFilter == k) null else k; group = null },
+                                label = { Text(k.label) },
+                            )
+                        }
+                    }
+                }
+                val showSourceChip = section == Section.All && filterName != null
+                if (groups.isNotEmpty() || showSourceChip || (isTv && query.isNotBlank())) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (isTv && query.isNotBlank()) item {
+                            FilterChip(
+                                selected = true,
+                                onClick = { query = "" },
+                                label = { Text("Search: $query", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp)) },
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(16.dp)) },
+                            )
+                        }
+                        if (showSourceChip) item {
+                            FilterChip(
+                                selected = true,
+                                onClick = { sourceFilter = null; group = null },
+                                label = { Text(filterName.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp)) },
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Show all channels", modifier = Modifier.size(16.dp)) },
+                            )
+                        }
+                        if (groups.isNotEmpty()) {
+                            item { FilterChip(selected = group == null, onClick = { group = null }, label = { Text("All groups") }) }
+                            items(groups) { g ->
+                                FilterChip(selected = group == g, onClick = { group = if (group == g) null else g }, label = { Text(g) })
+                            }
+                        }
+                    }
+                }
+
+                if (visible.isEmpty()) {
+                    EmptyState(section, filtered = query.isNotBlank() || group != null)
+                } else if (isTv) {
+                    // The tiles are sized so exactly [tileCount] fit on the screen: the rows share the height
+                    BoxWithConstraints(Modifier.weight(1f)) {
+                        val gap = 12.dp
+                        // The rows share the height exactly, leaving 8 dp at the bottom (less than the gap), so the next row never peeks in
+                        val rowHeight = ((maxHeight - 8.dp - 8.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
+                    // Each tab (and folder) opens at its own top, not where the previous tab was scrolled to
+                    key(section, group, sourceFilter) {
+                    val gridState = rememberLazyGridState()
+                    // The grid moves a whole row at a time, keeping the selected row in the middle: the tiles never end up
+                    // half off the screen, and the picture doesn't jump by uneven amounts
+                    LaunchedEffect(tvSelected, tvInGrid, tileCount) {
+                        if (tvInGrid && visible.isNotEmpty()) {
+                            val columns = tileCount.columns
+                            val row = tvSelected.coerceIn(0, visible.size - 1) / columns
+                            val firstRow = (row - (tileCount.rows - 1) / 2).coerceAtLeast(0)
+                            if (gridState.firstVisibleItemIndex / columns != firstRow || gridState.firstVisibleItemScrollOffset != 0) {
+                                gridState.animateScrollToItem(firstRow * columns)
+                            }
+                        }
+                    }
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(tileCount.columns),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                        verticalArrangement = Arrangement.spacedBy(gap),
+                    ) {
+                        itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                            // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
+                            LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
+                            ChannelTile(
+                                modifier = Modifier.height(rowHeight),
+                                selected = tvInGrid && tvSelected.coerceIn(0, visible.size - 1) == i,
+                                menuSignal = tvMenuSignal,
+                                channel = ch,
+                                number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
+                                saved = numbers[ch.url] != null,
+                                onClick = {
+                                    if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
+                                    else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
+                                },
+                                onToggleFavorite = { store.toggleFavorite(ch) },
+                                onRename = { dialog = HomeDialog.Rename(ch) },
+                                onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
+                                onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
+                                onRemove = { store.remove(ch.url) },
+                                removeLabel = "Delete channel",
+                                onAir = NowNext.of(guides[ch.url], nowSeconds),
+                                onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
+                                fillHeight = true,
+                            )
+                        }
+                    }
+                    }
+                    }
+                } else if (phoneGrid) {
+                    // The phone's grid: 3 cards across when held upright, more on a tablet or sideways
+                    key(section, group, sourceFilter) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 108.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 96.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                            LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
+                            val saved = numbers[ch.url] != null
+                            val guideLogin = loginFor(ch)
+                            PhoneTile(
+                                channel = ch,
+                                tag = if (section == Section.Sport || section == Section.Israel) ch.group else null,
+                                onAir = NowNext.of(guides[ch.url], nowSeconds),
+                                onClick = {
+                                    if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
+                                    else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
+                                },
+                                onToggleFavorite = { store.toggleFavorite(ch) },
+                                menuItems = { close ->
+                                    if (saved) AppMenuItem(text = { Text("Rename") }, onClick = { close(); dialog = HomeDialog.Rename(ch) })
+                                    else AppMenuItem(text = { Text("Save to channels") }, onClick = { close(); store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") })
+                                    if (guideLogin != null) AppMenuItem(text = { Text("TV guide") }, onClick = { close(); dialog = HomeDialog.Guide(ch, guideLogin) })
+                                    AppMenuItem(text = { Text("Play on TV") }, onClick = {
+                                        close()
+                                        val from = (i - 100).coerceAtLeast(0)
+                                        val to = (i + 100).coerceAtMost(visible.size)
+                                        dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
+                                    })
+                                    AppMenuItem(text = { Text("Copy link") }, onClick = { close(); clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") })
+                                    AppMenuItem(text = { Text("Delete channel") }, onClick = {
+                                        close()
+                                        store.remove(ch.url)
+                                    })
+                                },
+                            )
+                        }
+                    }
+                    }
+                } else {
+                    key(section, group, sourceFilter) {
+                    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 96.dp)) {
+                        itemsIndexed(visible, key = { _, ch -> ch.url }) { i, ch ->
+                            // Asks for this channel's guide while it's on screen (again each minute; a fresh one isn't fetched again)
+                            LaunchedEffect(ch.url, nowSeconds / 60) { loginFor(ch)?.let { NowOn.want(ch.url, it) } }
+                            ChannelRow(
+                                modifier = if (i == 0) Modifier.focusRequester(firstRowFocus) else Modifier,
+                                channel = ch,
+                                number = if (section == Section.Sport || section == Section.Israel) i + 1 else numbers[ch.url],
+                                saved = numbers[ch.url] != null,
+                                onClick = {
+                                    if (ch.kind == Kind.SERIES) dialog = HomeDialog.Series(ch)
+                                    else onPlay(visible.filter { it.kind != Kind.SERIES }, visible.subList(0, i).count { it.kind != Kind.SERIES }, format)
+                                },
+                                onToggleFavorite = { store.toggleFavorite(ch) },
+                                onRename = { dialog = HomeDialog.Rename(ch) },
+                                onSave = { store.addAll(listOf(ch)); notify("Saved “${ch.name}”.") },
+                                onCopy = { clipboard.setText(AnnotatedString(ch.url)); notify("Link copied.") },
+                                onPlayOnTv = if (isTv) null else {
+                                    {
+                                        val from = (i - 100).coerceAtLeast(0)
+                                        val to = (i + 100).coerceAtMost(visible.size)
+                                        dialog = HomeDialog.PickTv(TvJob.Play(visible.subList(from, to), i - from))
+                                    }
+                                },
+                                onRemove = {
+                                    store.remove(ch.url)
+                                },
+                                removeLabel = "Delete channel",
+                                onAir = NowNext.of(guides[ch.url], nowSeconds),
+                                onGuide = loginFor(ch)?.let { login -> { dialog = HomeDialog.Guide(ch, login) } },
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                    }
                     }
                 }
                 }
-            }
             }
         }
     }
+    if (isTv) homeScaffold() else ModalNavigationDrawer(
+        drawerState = drawerState,
+        // Only a tap on ☰ opens it: swiping sideways changes tabs
+        gesturesEnabled = drawerState.isOpen,
+        drawerContent = {
+            ModalDrawerSheet(drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp), modifier = Modifier.width(318.dp)) {
+                // Built only while it is open (or opening/closing): nothing to keep up to date while it's hidden
+                if (drawerState.currentValue == DrawerValue.Open || drawerState.targetValue == DrawerValue.Open) DrawerColumn(
+                    version = appVersion,
+                    account = mainAccount?.name,
+                    accountDetail = mainAccount?.let { "%,d channels".format(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · updated " + DateUtils.getRelativeTimeSpanString(it.updatedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS) else "" },
+                    onAccount = { closeDrawer(); section = Section.Playlists },
+                ) {
+                    fun go(s: Section) { closeDrawer(); section = s; sourceFilter = null; group = null }
+                    DrawerSection("Channels", divider = false)
+                    DrawerRow(Icons.Default.LiveTv, "All channels", { go(Section.All) }, section == Section.All) { DrawerCount(channels.size) }
+                    DrawerRow(Icons.Default.SportsSoccer, "Sport", { go(Section.Sport) }, section == Section.Sport) { DrawerCount(sportPicked.size) }
+                    DrawerRow(Icons.Default.Tv, "Israeli TV", { go(Section.Israel) }, section == Section.Israel) { DrawerCount(israelPicked.size) }
+                    DrawerRow(Icons.Default.Star, "Favorites", { go(Section.Favorites) }, section == Section.Favorites) { DrawerCount(channels.count { it.favorite }) }
+                    DrawerRow(Icons.AutoMirrored.Filled.PlaylistPlay, "My playlists", { go(Section.Playlists) }, section == Section.Playlists)
+
+                    DrawerSection("Account & sharing")
+                    DrawerRow(Icons.Default.Add, "Add playlist", { closeDrawer(); dialog = HomeDialog.AddPlaylist() })
+                    if (sources.isNotEmpty()) DrawerRow(Icons.Default.Refresh, "Update all playlists", { closeDrawer(); sources.forEach { loadPlaylist(it.url) } })
+                    DrawerRow(Icons.Default.QrCode2, "Share account with QR code", {
+                        closeDrawer()
+                        when (xtreamSources.size) {
+                            0 -> notify("Sign in to an account first (+ Add playlist → Login).")
+                            1 -> dialog = HomeDialog.ShareQr(xtreamSources[0])
+                            else -> { section = Section.Playlists; notify("Tap ⋮ next to the account → Share with QR code.") }
+                        }
+                    })
+                    DrawerRow(Icons.Default.Cast, "Send login to TV", {
+                        closeDrawer()
+                        when (xtreamSources.size) {
+                            0 -> notify("Sign in to an account first (+ Add playlist → Login).")
+                            1 -> dialog = HomeDialog.PickTv(TvJob.Login(xtreamSources[0]))
+                            else -> { section = Section.Playlists; notify("Tap ⋮ next to the account → Send login to TV.") }
+                        }
+                    })
+                    DrawerRow(Icons.Default.PhonelinkRing, "Continue from TV", { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.TakeOver) })
+
+                    DrawerSection("Settings")
+                    DrawerRow(Icons.AutoMirrored.Filled.VolumeUp, "Sound with screen off", { backgroundSound = !backgroundSound; BackgroundAudio.setEnabled(context, backgroundSound) }) {
+                        DrawerSwitch(backgroundSound) { backgroundSound = it; BackgroundAudio.setEnabled(context, it) }
+                    }
+                    DrawerRow(Icons.Default.GridView, "View", { phoneGrid = !phoneGrid; PhoneView.setGrid(context, phoneGrid) }) {
+                        DrawerSegments(listOf("List", "Grid"), if (phoneGrid) 1 else 0) { phoneGrid = it == 1; PhoneView.setGrid(context, phoneGrid) }
+                    }
+                    if (sources.isNotEmpty()) DrawerRow(Icons.Default.Link, if (linkBarOpen) "Hide the link bar" else "Open a stream link", { closeDrawer(); linkBarOpen = !linkBarOpen })
+
+                    DrawerSection("Help")
+                    DrawerRow(Icons.Default.SystemUpdate, "Check for updates", {
+                        closeDrawer()
+                        scope.launch {
+                            try {
+                                val found = Updates.check(context, force = true)
+                                if (found != null) dialog = HomeDialog.Update(found)
+                                else notify("You have the latest version.")
+                            } catch (e: Exception) {
+                                AppLog.e("update", "Check failed: ${e.message}")
+                                notify("Couldn't check for updates.")
+                            }
+                        }
+                    })
+                    DrawerRow(Icons.Default.BugReport, "Send problem report", { closeDrawer(); dialog = HomeDialog.Report(Problems.report(context)) })
+                    DrawerRow(Icons.Default.Tv, "Problems from TV", { closeDrawer(); dialog = HomeDialog.PickTv(TvJob.Logs) })
+                    DrawerRow(Icons.Default.Info, "About", { closeDrawer(); dialog = HomeDialog.About })
+                }
+            }
+        },
+    ) { homeScaffold() }
+    BackHandler(enabled = drawerState.isOpen) { closeDrawer() }
+
 
     when (val d = dialog) {
         is HomeDialog.Rename -> TextDialog(
@@ -1223,6 +1325,19 @@ private fun HomeScreen(
                 }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
+        )
+        HomeDialog.About -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            icon = { Image(painterResource(R.drawable.splash_icon), contentDescription = null, modifier = Modifier.size(72.dp)) },
+            title = { Text("Stream Desk") },
+            text = {
+                Text(
+                    "Version ${runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()}\n\n" +
+                        "Live TV from your IPTV account on the phone, the TV and the PC: Sport and Israeli TV lists, the TV guide, " +
+                        "favorites, and sharing an account with a QR code.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text("OK") } },
         )
         is HomeDialog.ShareQr -> ShareLoginDialog(d.source, onDismiss = { dialog = null }, onDone = { notify(it) })
         is HomeDialog.SharedLogin -> AddSharedLoginDialog(

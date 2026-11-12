@@ -79,6 +79,22 @@ class PhoneGridTest {
             compose.onNodeWithContentDescription("Close search").performClick(); settle()
             compose.onNodeWithContentDescription("Search channels").assertExists()
             compose.onNodeWithText("2 channels").assertDoesNotExist()   // the filter is cleared
+
+            // The side menu: ☰ opens it, a channel list in it opens that tab, and the ⋮ menu is gone from the phone
+            compose.onNodeWithContentDescription("More options").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Menu").performClick(); settle()
+            compose.onNodeWithText("Share account with QR code").assertExists()
+            compose.onNodeWithText("Sound with screen off").assertExists()
+            System.getProperty("tvshots")?.let { dir ->
+                scenario.onActivity { a ->
+                    val v = a.window.decorView
+                    val b = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
+                    v.draw(android.graphics.Canvas(b))
+                    File(dir, "phone-drawer.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                }
+            }
+            compose.onNodeWithText("Israeli TV", useUnmergedTree = true).let { compose.onAllNodesWithText("Israeli TV")[1].performClick() }; settle()
+            compose.onNodeWithText("Share account with QR code").assertDoesNotExist()   // closed again
         }
     }
 }
