@@ -137,6 +137,9 @@ private data class Stats(
 
 @OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
+    // The player keeps its controls left to right in every language
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(newBase.withAppDirection(rtlAllowed = false))
+
     private lateinit var store: ChannelStore
     private lateinit var player: ExoPlayer
     private lateinit var http: DefaultHttpDataSource.Factory

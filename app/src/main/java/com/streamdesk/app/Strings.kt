@@ -40,6 +40,21 @@ object Lang {
     }
 }
 
+/**
+ * The screen's direction for a whole activity, so its pop-up windows (Settings, menus, dialogs) follow it too:
+ * right-to-left in Hebrew, left-to-right otherwise. [rtlAllowed] is false for the player and the TV, which stay
+ * left-to-right whatever the phone's language.
+ */
+fun Context.withAppDirection(rtlAllowed: Boolean = true): Context {
+    Lang.load(this)
+    val config = android.content.res.Configuration(resources.configuration)
+    config.setLayoutDirection(if (rtlAllowed && Lang.hebrew) Locale("iw") else Locale.ENGLISH)
+    return createConfigurationContext(config)
+}
+
+/** Set when the language changes on the Settings screen, so it opens again after the screen is rebuilt. */
+@Volatile var reopenSettings = false
+
 /** The text in the app's language (the English text is the key). */
 fun t(en: String): String = if (Lang.hebrew) HE[en] ?: en else en
 

@@ -1,6 +1,6 @@
 {
-  "versionCode": 101,
-  "versionName": "3.80",
+  "versionCode": 102,
+  "versionName": "3.81",
   "apk": "StreamDesk.apk",
-  "notes": "Settings: long names wrap onto a second line instead of being cut off"
+  "notes": "Hebrew: Settings and all pop-up windows now turn right-to-left too"
 }

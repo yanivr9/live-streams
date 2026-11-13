@@ -67,3 +67,21 @@ class PhoneQualityTest {
         assertEquals(QualityCap.FullHd, DeviceQuality.cap(context))
     }
 }
+
+/** Hebrew turns the whole app right to left (pop-up windows read this); the player always stays left to right. */
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [34])
+class AppDirectionTest {
+    private val context: android.content.Context get() = androidx.test.core.app.ApplicationProvider.getApplicationContext()
+
+    @Test
+    fun hebrewIsRightToLeftExceptThePlayer() {
+        Lang.set(context, LangMode.Hebrew)
+        assertEquals(android.view.View.LAYOUT_DIRECTION_RTL, context.withAppDirection().resources.configuration.layoutDirection)
+        assertEquals(android.view.View.LAYOUT_DIRECTION_LTR, context.withAppDirection(rtlAllowed = false).resources.configuration.layoutDirection)
+        Lang.set(context, LangMode.English)
+        assertEquals(android.view.View.LAYOUT_DIRECTION_LTR, context.withAppDirection().resources.configuration.layoutDirection)
+        // Hand the changed setting over to Compose, or the next tests' screens wait for it forever
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+    }
+}

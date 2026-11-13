@@ -217,6 +217,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    // Hebrew turns the whole screen, pop-ups included, right to left
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(newBase.withAppDirection())
+
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
     private var sharedLogin by mutableStateOf<Pair<XtreamLogin, String?>?>(null)   // an account from another phone's QR code
 
@@ -424,7 +427,7 @@ private fun HomeScreen(
     // The "enter a link" bar is only in the way once there's a playlist; ⋮ → Open a link brings it back
     var linkBarOpen by rememberSaveable { mutableStateOf(false) }
     val showLinkBar = sources.isEmpty() || linkBarOpen
-    var dialog by remember { mutableStateOf<HomeDialog?>(crashReport?.let { HomeDialog.Crash(it) }) }
+    var dialog by remember { mutableStateOf<HomeDialog?>(crashReport?.let { HomeDialog.Crash(it) } ?: if (reopenSettings) HomeDialog.Settings.also { reopenSettings = false } else null) }
 
     fun notify(msg: String) = scope.launch {
         snackbar.currentSnackbarData?.dismiss()
@@ -1400,9 +1403,16 @@ private fun HomeScreen(
                           DrawerSegments(listOf(t("Phone"), t("Dark"), t("Light")), ThemePrefs.mode.ordinal) { ThemePrefs.set(context, ThemeMode.entries[it]) }
                       }
                       DrawerRow(Icons.Default.Language, t("Language"), {
+                          val wasHebrew = Lang.hebrew
                           Lang.set(context, LangMode.entries[(Lang.mode.ordinal + 1) % LangMode.entries.size])
+                          if (Lang.hebrew != wasHebrew) { reopenSettings = true; (context as? android.app.Activity)?.recreate() }
                       }) {
-                          DrawerSegments(listOf(t("Phone"), "עברית", "English"), Lang.mode.ordinal) { Lang.set(context, LangMode.entries[it]) }
+                          DrawerSegments(listOf(t("Phone"), "עברית", "English"), Lang.mode.ordinal) {
+                              val wasHebrew = Lang.hebrew
+                              Lang.set(context, LangMode.entries[it])
+                              // A new direction needs the screen rebuilt; Settings opens again straight after
+                              if (Lang.hebrew != wasHebrew) { reopenSettings = true; (context as? android.app.Activity)?.recreate() }
+                          }
                       }
                       DrawerSection(t("Video"))
                       DrawerRow(Icons.Default.HighQuality, t("Video quality"), {
