@@ -1,6 +1,6 @@
 {
-  "versionCode": 105,
-  "versionName": "3.84",
+  "versionCode": 106,
+  "versionName": "3.85",
   "apk": "StreamDesk.apk",
-  "notes": "Phone player: tap the picture to see the TV guide bar (channel, what's on now, progress)"
+  "notes": "Fix: Send picture and Save picture on Share with QR code work again"
 }
