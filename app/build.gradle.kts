@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 104
-        versionName = "3.83"
+        versionCode = 105
+        versionName = "3.84"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -43,6 +43,8 @@ android {
         unitTests.all {
             // About what Android gives one app on a typical phone (largeHeap raises it on some)
             it.maxHeapSize = "1g"   // the screen tests run a whole simulated Android
+            // A fresh test machine every 15 test classes: screens left over from earlier tests can otherwise hold up later ones
+            it.forkEvery = 15
             // The simulated Android's system files, from Google's copy of Maven Central (the main site often says "too many requests")
             System.getProperty("tvshots")?.let { dir -> it.systemProperty("tvshots", dir) }   // pictures of the TV screens, on request
             System.getProperty("qa")?.let { dir -> it.systemProperty("qa", dir) }   // QA walk-through pictures, on request

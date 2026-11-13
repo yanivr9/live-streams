@@ -927,6 +927,11 @@ class PlayerActivity : ComponentActivity() {
                         keepScreenOn = true
                         setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
                         setShowSubtitleButton(true)
+                        // Live TV: nothing to rewind or skip; CH + / − and the guide bar do the channel changing
+                        setShowRewindButton(false)
+                        setShowFastForwardButton(false)
+                        setShowPreviousButton(false)
+                        setShowNextButton(false)
                         setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
                             controlsVisible = v == View.VISIBLE
                         })
@@ -981,6 +986,24 @@ class PlayerActivity : ComponentActivity() {
                         .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
+            }
+
+            // Phone: a tap on the picture shows the controls and, with them, the channel and its guide as a glass bar
+            if (!isTv) {
+                val guides by NowOn.guides.collectAsState()
+                val ch = current
+                val nowSeconds = rememberNowSeconds()
+                AnimatedVisibility(
+                    visible = controlsVisible && ch != null && castTarget == null,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                        .padding(bottom = 96.dp),   // above the player's own bar at the bottom
+                ) {
+                    if (ch != null) GuideBar(GuideBannerInfo(ch, index + 1, queue.size, NowNext.of(guides[ch.url], nowSeconds)), compact = true)
+                }
             }
 
             // TV: the channel and its guide as a bar along the bottom of the picture

@@ -1,6 +1,6 @@
 {
-  "versionCode": 104,
-  "versionName": "3.83",
+  "versionCode": 105,
+  "versionName": "3.84",
   "apk": "StreamDesk.apk",
-  "notes": "Clearer: 'list updated 4 hours ago' (when the channel list was last downloaded)"
+  "notes": "Phone player: tap the picture to see the TV guide bar (channel, what's on now, progress)"
 }

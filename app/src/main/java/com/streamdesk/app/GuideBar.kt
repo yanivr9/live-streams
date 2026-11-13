@@ -38,23 +38,24 @@ data class GuideBannerInfo(val channel: Channel, val number: Int, val total: Int
  * safe margins so nothing is cut off at the edge.
  */
 @Composable
-fun GuideBar(info: GuideBannerInfo, modifier: Modifier = Modifier) = BoxWithConstraints(modifier.fillMaxWidth()) {
+fun GuideBar(info: GuideBannerInfo, modifier: Modifier = Modifier, compact: Boolean = false) = BoxWithConstraints(modifier.fillMaxWidth()) {
+    // compact: the phone's smaller version (tighter edges, smaller logo); the TV keeps the roomy one
     val ch = info.channel
     val air = info.air
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(if (compact) 18.dp else 24.dp)
     val roomForNext = maxWidth >= 760.dp   // on a narrower screen the guide for "now" gets all the room
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 48.dp, end = 48.dp, bottom = 40.dp)
+            .padding(start = if (compact) 12.dp else 48.dp, end = if (compact) 12.dp else 48.dp, bottom = if (compact) 0.dp else 40.dp)
             .background(Color(0xC20E1113), shape)
             .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
-            .padding(horizontal = 24.dp, vertical = 18.dp),
+            .padding(horizontal = if (compact) 14.dp else 24.dp, vertical = if (compact) 12.dp else 18.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(22.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 22.dp),
     ) {
         // Logo on a white card, as it is on the tiles; the number when the channel has none
-        Box(Modifier.size(96.dp).clip(RoundedCornerShape(16.dp)).background(Color.White), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(if (compact) 56.dp else 96.dp).clip(RoundedCornerShape(if (compact) 12.dp else 16.dp)).background(Color.White), contentAlignment = Alignment.Center) {
             if (ch.logo.startsWith("http") || ch.logo.startsWith("file:///android_asset/")) {
                 AsyncImage(model = ch.logo, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().padding(8.dp))
             } else {
