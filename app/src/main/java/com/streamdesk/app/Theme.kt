@@ -72,10 +72,12 @@ object ThemePrefs {
 
     fun load(context: Context) {
         mode = runCatching { ThemeMode.valueOf(prefs(context).getString("theme", null).orEmpty()) }.getOrDefault(ThemeMode.System)
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()   // screens see the change at once (also before the first screen exists)
     }
 
     fun set(context: Context, value: ThemeMode) {
         mode = value
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()   // screens see the change at once (also before the first screen exists)
         prefs(context).edit().putString("theme", value.name).apply()
     }
 }

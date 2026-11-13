@@ -2422,10 +2422,19 @@ private fun SportListEditor(initial: SportSettings, onDismiss: () -> Unit, onSav
     )
 }
 
-/** "just now", "5 minutes ago", "yesterday": when a playlist was last updated. */
-private fun updatedAgo(at: Long): String =
-    if (System.currentTimeMillis() - at < 60_000) t("just now")
-    else DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+/** "just now", "5 minutes ago", "4 hours ago", "2 days ago": when a playlist was last updated, in the app's language. */
+private fun updatedAgo(at: Long): String {
+    val minutes = ((System.currentTimeMillis() - at) / 60_000).coerceAtLeast(0)
+    return when {
+        minutes < 1 -> t("just now")
+        minutes == 1L -> t("1 minute ago")
+        minutes < 60 -> t("%d minutes ago").format(minutes)
+        minutes < 120 -> t("1 hour ago")
+        minutes < 24 * 60 -> t("%d hours ago").format(minutes / 60)
+        minutes < 48 * 60 -> t("yesterday")
+        else -> t("%d days ago").format(minutes / (24 * 60))
+    }
+}
 
 /** The bottom bar's icon for each tab. */
 private fun Section.icon(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {

@@ -32,10 +32,12 @@ object Lang {
     fun load(context: Context) {
         tv = context.isTelevision()
         mode = runCatching { LangMode.valueOf(prefs(context).getString("language", null).orEmpty()) }.getOrDefault(LangMode.System)
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()   // screens see the change at once (also before the first screen exists)
     }
 
     fun set(context: Context, value: LangMode) {
         mode = value
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()   // screens see the change at once (also before the first screen exists)
         prefs(context).edit().putString("language", value.name).apply()
     }
 }
@@ -103,6 +105,12 @@ private val HE = mapOf(
     "About" to "אודות",
     "updated" to "עודכן",
     "just now" to "הרגע",
+    "1 minute ago" to "לפני דקה",
+    "%d minutes ago" to "לפני %d דקות",
+    "1 hour ago" to "לפני שעה",
+    "%d hours ago" to "לפני %d שעות",
+    "yesterday" to "אתמול",
+    "%d days ago" to "לפני %d ימים",
     // Settings
     "Look" to "מראה",
     "Theme" to "ערכת נושא",
