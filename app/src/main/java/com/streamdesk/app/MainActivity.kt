@@ -1308,7 +1308,7 @@ private fun HomeScreen(
                 if (drawerState.currentValue == DrawerValue.Open || drawerState.targetValue == DrawerValue.Open) DrawerColumn(
                     version = appVersion,
                     account = mainAccount?.name,
-                    accountDetail = mainAccount?.let { channelsCount(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · " + t("updated") + " " + updatedAgo(it.updatedAt) else "" },
+                    accountDetail = mainAccount?.let { channelsCount(channels.count { c -> c.source == it.url }) + if (it.updatedAt > 0) " · " + t("list updated") + " " + updatedAgo(it.updatedAt) else "" },
                     onAccount = { closeDrawer(); if (sources.size > 1) dialog = HomeDialog.PickAccount else section = Section.Playlists },
                 ) {
                     fun go(s: Section) { closeDrawer(); section = s; sourceFilter = null; group = null }
@@ -1716,8 +1716,8 @@ private fun PlaylistsPane(
                         Text(
                             if (s.url in loading) progress[s.url].orEmpty()
                             else if (s.updatedAt == 0L) (if (s.xtream != null) "${s.xtream.username} · not loaded yet" else "Not loaded yet")
-                            else if (s.xtream != null) "${t("Signed in as")} ${s.xtream.username} · ${t("updated")} ${updatedAgo(s.updatedAt)}"
-                            else "${channelsCount(s.channelCount)} · ${t("updated")} ${updatedAgo(s.updatedAt)}",
+                            else if (s.xtream != null) "${t("Signed in as")} ${s.xtream.username} · ${t("list updated")} ${updatedAgo(s.updatedAt)}"
+                            else "${channelsCount(s.channelCount)} · ${t("list updated")} ${updatedAgo(s.updatedAt)}",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         MonoLine(s.xtream?.base ?: s.url)

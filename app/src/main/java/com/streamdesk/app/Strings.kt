@@ -104,6 +104,7 @@ private val HE = mapOf(
     "Problems from TV" to "תקלות מהטלוויזיה",
     "About" to "אודות",
     "updated" to "עודכן",
+    "list updated" to "הרשימה עודכנה",
     "just now" to "הרגע",
     "1 minute ago" to "לפני דקה",
     "%d minutes ago" to "לפני %d דקות",

@@ -14,8 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assume.assumeTrue
@@ -31,28 +33,35 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class SettingsLookTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    // Opens nothing unless pictures are asked for (a test screen left open would hold up the next tests)
+    @get:Rule val compose = createEmptyComposeRule()
 
     @Test
     fun longNamesWrap() {
         val dir = System.getProperty("qashots")?.let(::File)
         assumeTrue(dir != null)
-        compose.setContent {
-            StreamDeskTheme {
-                Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    DrawerSection("Look", divider = false)
-                    DrawerRow(Icons.Default.DarkMode, "Theme", {}) { DrawerSegments(listOf("Phone", "Dark", "Light"), 0) {} }
-                    DrawerRow(Icons.Default.Language, "Language", {}) { DrawerSegments(listOf("Phone", "עברית", "English"), 2) {} }
-                    DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {}) { DrawerSwitch(true) {} }
-                    DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", {}) { DrawerSwitch(true) {} }
-                    DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", {}) { DrawerSwitch(true) {} }
+        ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
+            scenario.onActivity { a ->
+                a.setContent {
+                StreamDeskTheme {
+                    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        DrawerSection("Look", divider = false)
+                        DrawerRow(Icons.Default.DarkMode, "Theme", {}) { DrawerSegments(listOf("Phone", "Dark", "Light"), 0) {} }
+                        DrawerRow(Icons.Default.Language, "Language", {}) { DrawerSegments(listOf("Phone", "עברית", "English"), 2) {} }
+                        DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {}) { DrawerSwitch(true) {} }
+                        DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", {}) { DrawerSwitch(true) {} }
+                        DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", {}) { DrawerSwitch(true) {} }
+                    }
                 }
             }
+            }
+            compose.waitForIdle()
+            scenario.onActivity { a ->
+                val v = a.window.decorView
+                val img = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
+                v.draw(android.graphics.Canvas(img))
+                File(dir!!, "settings-lines.png").outputStream().use { img.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
         }
-        compose.waitForIdle()
-        val v = compose.activity.window.decorView
-        val img = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
-        v.draw(android.graphics.Canvas(img))
-        File(dir, "settings-lines.png").outputStream().use { img.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

@@ -1,6 +1,6 @@
 {
-  "versionCode": 103,
-  "versionName": "3.82",
+  "versionCode": 104,
+  "versionName": "3.83",
   "apk": "StreamDesk.apk",
-  "notes": "'updated 4 hours ago' in the app's language (no more mixed English and Hebrew)"
+  "notes": "Clearer: 'list updated 4 hours ago' (when the channel list was last downloaded)"
 }
