@@ -104,7 +104,8 @@ object LoginQr {
     }
 
     private fun card(context: Context, text: String): Bitmap {
-        val qr = bitmap(text, 900)
+        // A drawable copy: the logo is painted onto it (a bitmap made from pixels can't be drawn on)
+        val qr = bitmap(text, 900).copy(Bitmap.Config.ARGB_8888, true)
         val logo = runCatching {
             val d = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.splash_icon)!!
             val b = Bitmap.createBitmap(220, 220, Bitmap.Config.ARGB_8888)
@@ -153,6 +154,8 @@ object LoginQr {
 @Composable
 fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (String) -> Unit) {
     val context = LocalContext.current
+    // Shown over this window (the app's own messages appear behind it)
+    val tell: (String) -> Unit = { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
     val login = source.xtream ?: return
     val text = remember(source) { LoginQr.encode(login, source.name) }
     val qr = remember(text) { LoginQr.bitmap(text).asImageBitmap() }
@@ -179,11 +182,11 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         OutlinedButton(onClick = {
-                            onDone(if (LoginQr.save(context, text, source.name)) "Saved to Pictures › Livio." else "Couldn't save the picture.")
+                            tell(if (runCatching { LoginQr.save(context, text, source.name) }.getOrDefault(false)) "Saved to Pictures › Livio." else "Couldn't save the picture.")
                         }) { Text("Save picture") }
                     }
                     Button(
-                        onClick = { runCatching { LoginQr.send(context, text) }.onFailure { onDone("Couldn't send the picture.") } },
+                        onClick = { runCatching { LoginQr.send(context, text) }.onFailure { AppLog.e("share", "Sending the QR picture failed", it); tell("Couldn't send the picture.") } },
                         colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = FocusInk),
                     ) { Text("Send picture") }
                 }
