@@ -1,6 +1,6 @@
 {
-  "versionCode": 100,
-  "versionName": "3.79",
+  "versionCode": 101,
+  "versionName": "3.80",
   "apk": "StreamDesk.apk",
-  "notes": "Hebrew: ☰ → Settings → Language (like the phone / עברית / English), right-to-left screens"
+  "notes": "Settings: long names wrap onto a second line instead of being cut off"
 }

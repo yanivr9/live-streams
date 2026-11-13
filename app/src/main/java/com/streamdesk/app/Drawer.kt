@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -97,7 +98,7 @@ fun DrawerRow(
         Modifier
             .padding(end = 14.dp)
             .fillMaxWidth()
-            .height(48.dp)
+            .heightIn(min = 48.dp)   // long names (or larger text) get a second line instead of being cut off
             // The tap goes on the whole line first, then the rounded highlight is painted (a clip with uneven corners in
             // front of the tap area can swallow touches)
             .clickable(role = Role.Button, onClick = onClick)
@@ -107,8 +108,18 @@ fun DrawerRow(
     ) {
         Icon(icon, contentDescription = null, tint = if (selected) Amber else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(16.dp))
-        Text(label, color = tint, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        trailing?.invoke()
+        Text(
+            label,
+            color = tint,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
+        }
     }
 }
 
