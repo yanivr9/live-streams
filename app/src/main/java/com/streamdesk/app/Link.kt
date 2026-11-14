@@ -188,19 +188,81 @@ class LinkServer(
             .firstOrNull { it.substringBefore('=') == name }?.substringAfter('=', "")
             ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrDefault("") }.orEmpty()
 
+    /**
+     * The page the TV's QR code opens on a phone. An Android phone with Livio opens the app; any other phone (an iPhone)
+     * types a login or a playlist link here and sends it straight to the TV over the home Wi-Fi.
+     */
     private fun connectPage(host: String, port: Int, code: String): String {
         val name = URLEncoder.encode(deviceName, "UTF-8")
         val query = "host=$host&port=$port&code=$code&name=$name"
         val intent = "intent://connect?$query#Intent;scheme=streamdesk;package=com.streamdesk.app;end"
         val spaced = code.chunked(3).joinToString(" ")
+        val tv = htmlEscape(deviceName)
         return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Livio</title>
-<style>body{font-family:sans-serif;background:#0e1113;color:#e3e8ea;text-align:center;padding:32px 20px}h2{margin-bottom:8px}
-a.b{display:block;margin:28px auto;max-width:360px;padding:18px;border-radius:12px;background:#ff9f1c;color:#1a1205;font-weight:700;font-size:20px;text-decoration:none}
-.c{font:700 34px monospace;color:#ff9f1c;margin:10px 0}p{color:#c4cdd2;line-height:1.5}</style></head>
-<body><h2>Connect to ${htmlEscape(deviceName)}</h2><p>Tap the button to open Livio on this phone.</p>
-<a class="b" href="$intent">Open Livio</a>
-<p>If nothing happens, install Livio on this phone, or open it and use Playlists, then the three dots, then Send login to TV, and type this code:</p>
-<div class="c">$spaced</div></body></html>"""
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#0e1113;color:#e3e8ea;padding:28px 18px 40px}
+.w{max-width:420px;margin:0 auto}.logo{font:800 30px -apple-system,system-ui,sans-serif;text-align:center}.logo b{color:#ff9f1c}
+h2{font-size:20px;text-align:center;margin:6px 0 18px;font-weight:600}
+.seg{display:flex;border:1px solid #3a4246;border-radius:999px;overflow:hidden;margin-bottom:16px}
+.seg button{flex:1;border:0;background:none;color:#e3e8ea;font-size:16px;padding:11px}.seg button.on{background:#ff9f1c;color:#1a1205;font-weight:700}
+label{display:block;font-size:13px;color:#9aa5ab;margin:12px 0 5px}
+input{width:100%;font-size:17px;padding:13px 14px;border-radius:12px;border:1px solid #3a4246;background:#171c1f;color:#e3e8ea}
+input:focus{outline:2px solid #ff9f1c;border-color:transparent}
+.go{display:block;width:100%;margin-top:20px;padding:16px;border:0;border-radius:14px;background:#ff9f1c;color:#1a1205;font-weight:700;font-size:18px}
+.go:disabled{opacity:.6}.msg{min-height:24px;margin-top:14px;text-align:center;font-size:15px;line-height:1.4}.ok{color:#7ddc8a}.bad{color:#ff8a7a}
+.note{font-size:13px;color:#9aa5ab;line-height:1.5;text-align:center;margin-top:16px}
+.app{border-top:1px solid #2a3135;margin-top:26px;padding-top:18px;text-align:center;font-size:14px;color:#9aa5ab}
+.app a{display:inline-block;margin-top:10px;padding:11px 22px;border:1px solid #ff9f1c;border-radius:999px;color:#ff9f1c;font-weight:600;text-decoration:none}
+.c{font:700 22px monospace;color:#ff9f1c;letter-spacing:2px}.hide{display:none}
+</style></head>
+<body><div class="w">
+<div class="logo">Livi<b>o</b></div>
+<h2>Send your channels to $tv</h2>
+<div class="seg"><button id="t0" class="on" onclick="mode(0)">Login</button><button id="t1" onclick="mode(1)">Playlist link</button></div>
+<form id="f" onsubmit="send(event)" autocomplete="off">
+<div id="m0">
+<label for="server">Server</label><input id="server" type="url" inputmode="url" placeholder="http://server.com:8080" autocapitalize="off" autocorrect="off" spellcheck="false">
+<label for="user">Username</label><input id="user" autocapitalize="off" autocorrect="off" spellcheck="false">
+<label for="pass">Password</label><input id="pass" type="password" autocapitalize="off" autocorrect="off" spellcheck="false">
+</div>
+<div id="m1" class="hide">
+<label for="link">Playlist link (M3U)</label><input id="link" type="url" inputmode="url" placeholder="https://…/get.php?…" autocapitalize="off" autocorrect="off" spellcheck="false">
+</div>
+<label for="name">Name (optional)</label><input id="name" placeholder="My TV">
+<button class="go" id="go" type="submit">Send to TV</button>
+</form>
+<div class="msg" id="msg"></div>
+<p class="note">🔒 The details go straight to the TV over your Wi-Fi. They aren't sent anywhere else.</p>
+<div class="app" id="app">Have Livio on an Android phone?<br><a href="$intent">Open Livio</a><br><br>Or in Livio: Send login to TV, and type <span class="c">$spaced</span></div>
+</div>
+<script>
+var CODE="$code",m=0;
+if(/iPhone|iPad|iPod/.test(navigator.userAgent))document.getElementById("app").className="hide";
+function el(i){return document.getElementById(i)}
+function mode(n){m=n;el("t0").className=n?"":"on";el("t1").className=n?"on":"";el("m0").className=n?"hide":"";el("m1").className=n?"":"hide";say("","")}
+function say(t,c){var e=el("msg");e.textContent=t;e.className="msg "+c}
+function fix(u){u=u.trim();if(u&&!/^https?:\/\//i.test(u))u="http://"+u;return u}
+function send(ev){
+ ev.preventDefault();var name=el("name").value.trim(),path,body;
+ if(m==0){var s=fix(el("server").value),u=el("user").value.trim(),p=el("pass").value;
+  if(!s||!u||!p){say("Fill in the server, username and password.","bad");return}
+  path="/login";body={login:{server:s,username:u,password:p,live:true,movies:false,series:false,categories:"Hebrew"},name:name,enabled:true,updateHours:24};
+ }else{var l=fix(el("link").value);
+  if(!l){say("Paste the playlist link.","bad");return}
+  path="/playlist";body={url:l,name:name};
+ }
+ el("go").disabled=true;say("Sending…","");
+ fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Link-Code":CODE},body:JSON.stringify(body)})
+ .then(function(r){
+  if(r.ok){say("Sent! The TV is loading the channels now.","ok");el("f").reset()}
+  else if(r.status==403)say("The code changed. Scan the QR code on the TV again.","bad");
+  else if(r.status==429)say("Too many tries. Wait a minute and try again.","bad");
+  else if(r.status==404)say("Update Livio on the TV, then try again.","bad");
+  else say("The TV couldn't use these details. Check them and try again.","bad");
+ }).catch(function(){say("Can't reach the TV. Make sure this phone is on the same Wi-Fi as the TV.","bad")})
+ .then(function(){el("go").disabled=false});
+}
+</script></body></html>"""
     }
 
     private fun htmlEscape(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")

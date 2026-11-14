@@ -1,6 +1,6 @@
 {
-  "versionCode": 107,
-  "versionName": "3.86",
+  "versionCode": 108,
+  "versionName": "3.87",
   "apk": "StreamDesk.apk",
-  "notes": "Share any playlist: a playlist link (not only a login) can now be shared with a QR code and sent to the TV (the TV needs 3.86 too)."
+  "notes": "iPhone + Android TV: scan the TV's QR code with any phone's camera, type the login or playlist link on the page that opens, and tap Send to TV."
 }

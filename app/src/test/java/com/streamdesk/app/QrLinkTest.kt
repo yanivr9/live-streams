@@ -82,6 +82,8 @@ class QrLinkTest {
         assertEquals(200, status)
         assertTrue(html, html.contains("intent://connect?host=127.0.0.1&port=$port&code=482913&name=Stream+Desk+%28Mi+Box%29#Intent;scheme=streamdesk;package=com.streamdesk.app;end"))
         assertTrue(html.contains("482 913"))
+        // an iPhone (no Livio app) can type a login or a playlist link on the same page and send it to the TV
+        assertTrue(html.contains("Send to TV") && html.contains("\"/login\"") && html.contains("\"/playlist\"") && html.contains("var CODE=\"482913\""))
         // the link on that page is a valid invitation for the phone's app
         val invite = LinkInvite.parse("streamdesk://connect?host=127.0.0.1&port=$port&code=482913&name=Stream+Desk+%28Mi+Box%29")
         assertEquals("Stream Desk (Mi Box)", invite!!.name)
