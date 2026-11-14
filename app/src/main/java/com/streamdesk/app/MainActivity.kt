@@ -221,7 +221,7 @@ class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(newBase.withAppDirection())
 
     private var invite by mutableStateOf<LinkInvite?>(null)   // set when the phone opens a TV's QR code link
-    private var sharedLogin by mutableStateOf<Pair<XtreamLogin, String?>?>(null)   // an account from another phone's QR code
+    private var sharedLogin by mutableStateOf<SharedAccount?>(null)   // an account from another phone's QR code
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()   // the system's logo screen, until the first frame below takes over
@@ -291,7 +291,7 @@ class MainActivity : ComponentActivity() {
     private fun importFromIntent(intent: Intent) {
         val uri = intent.data ?: return
         if (uri.scheme == "streamdesk" && uri.host == "login") {   // an account shared from another phone as a QR code
-            val parsed = LoginQr.parse(uri.toString())
+            val parsed = LoginQr.read(uri.toString())
             if (parsed != null) sharedLogin = parsed
             else Toast.makeText(this, "That QR code doesn't hold a Livio account.", Toast.LENGTH_LONG).show()
             return
@@ -366,7 +366,7 @@ private sealed interface HomeDialog {
     /** Showing an account as a QR code for another phone. */
     data class ShareQr(val source: PlaylistSource) : HomeDialog
     /** An account read from another phone's QR code, waiting for "Add account". */
-    data class SharedLogin(val login: XtreamLogin, val name: String?) : HomeDialog
+    data class SharedLogin(val account: SharedAccount) : HomeDialog
     data class PickTv(val job: TvJob) : HomeDialog
     data class Update(val info: UpdateInfo) : HomeDialog
     data class Guide(val channel: Channel, val login: XtreamLogin) : HomeDialog
@@ -394,7 +394,7 @@ private fun HomeScreen(
     crashReport: String? = null,
     invite: LinkInvite? = null,
     onInviteDone: () -> Unit = {},
-    sharedLogin: Pair<XtreamLogin, String?>? = null,
+    sharedLogin: SharedAccount? = null,
     onSharedLoginDone: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -523,16 +523,15 @@ private fun HomeScreen(
                     when (job) {
                         TvJob.TakeOver, TvJob.Logs -> Unit
                         is TvJob.Play -> LinkClient.play(device, code, job.queue, job.index)
-                        is TvJob.Login -> LinkClient.sendLogin(
-                            device, code,
-                            LoginRequest(job.source.xtream!!, job.source.name, job.source.enabled, job.source.updateHours, sportSettings),
-                        )
+                        is TvJob.Login -> job.source.xtream?.let { login ->
+                            LinkClient.sendLogin(device, code, LoginRequest(login, job.source.name, job.source.enabled, job.source.updateHours, sportSettings))
+                        } ?: LinkClient.sendPlaylist(device, code, job.source.url, job.source.name)
                     }
                 }
             }
             result.onSuccess {
                 LinkPrefs.save(context, device.host, code)
-                notify(if (job is TvJob.Login) "Login sent to ${device.name}." else "Playing on ${device.name}.")
+                notify(if (job is TvJob.Login) (if (job.source.xtream != null) "Login sent to ${device.name}." else "Playlist sent to ${device.name}.") else "Playing on ${device.name}.")
             }.onFailure { notify(it.message ?: "Couldn't reach the TV.") }
         }
     }
@@ -551,7 +550,7 @@ private fun HomeScreen(
     }
 
     LaunchedEffect(invite) { invite?.let { dialog = HomeDialog.Invite(it) } }
-    LaunchedEffect(sharedLogin) { sharedLogin?.let { (login, name) -> dialog = HomeDialog.SharedLogin(login, name); onSharedLoginDone() } }
+    LaunchedEffect(sharedLogin) { sharedLogin?.let { dialog = HomeDialog.SharedLogin(it); onSharedLoginDone() } }
     // + Add playlist → QR code: a picture of the QR code from the gallery
     val pickQr = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -559,8 +558,8 @@ private fun HomeScreen(
             val found = withContext(Dispatchers.IO) {
                 runCatching { LoginQr.readPicture(context, uri)?.let(LoginQr::decode) }.getOrNull()
             }
-            val parsed = LoginQr.parse(found)
-            if (parsed != null) dialog = HomeDialog.SharedLogin(parsed.first, parsed.second)
+            val parsed = LoginQr.read(found)
+            if (parsed != null) dialog = HomeDialog.SharedLogin(parsed)
             else notify(if (found == null) "No QR code found in that picture." else "That QR code isn't a Livio account.")
         }
     }
@@ -891,7 +890,7 @@ private fun HomeScreen(
     // Phone: ☰ opens a side menu with the channels, sharing, settings and help (the TV keeps its ⋮ menu)
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     fun closeDrawer() { scope.launch { drawerState.close() } }
-    val xtreamSources = sources.filter { it.xtream != null }
+    val xtreamSources = sources.filter { it.canShare }   // accounts and playlist links that can go to a friend or the TV
     val mainAccount = sources.firstOrNull { it.enabled } ?: sources.firstOrNull()
     val appVersion = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     val homeScaffold: @Composable () -> Unit = {
@@ -1492,9 +1491,13 @@ private fun HomeScreen(
         )
         is HomeDialog.ShareQr -> ShareLoginDialog(d.source, onDismiss = { dialog = null }, onDone = { notify(it) })
         is HomeDialog.SharedLogin -> AddSharedLoginDialog(
-            login = d.login,
-            name = d.name,
-            onAdd = { dialog = null; addLogin(d.login, d.name); notify(t("Account added. Loading the channels…")) },
+            account = d.account,
+            onAdd = {
+                dialog = null
+                val a = d.account
+                if (a.login != null) { addLogin(a.login, a.name); notify(t("Account added. Loading the channels…")) }
+                else if (a.link != null) loadPlaylist(a.link, a.name)
+            },
             onDismiss = { dialog = null },
         )
         is HomeDialog.AddPlaylist -> AddPlaylistDialog(
@@ -1546,7 +1549,7 @@ private fun HomeScreen(
         )
         HomeDialog.LinkPhone -> LinkPhoneDialog(onDismiss = { dialog = null })
         is HomeDialog.Invite -> {
-            val source = sources.firstOrNull { it.xtream != null && it.enabled }
+            val source = sources.firstOrNull { it.canShare && it.enabled }
             InviteDialog(
                 invite = d.invite,
                 canSendLogin = source != null,
@@ -1739,10 +1742,10 @@ private fun PlaylistsPane(
                                 AppMenuItem(text = { Text(t("Show channels")) }, onClick = { menu = false; onShow(s) })
                                 AppMenuItem(text = { Text(if (s.xtream != null) t("Edit login") else t("Rename")) }, onClick = { menu = false; onRename(s) })
                                 AppMenuItem(text = { Text(if (s.enabled) t("Turn off") else t("Turn on")) }, onClick = { menu = false; onToggle(s) })
-                                if (onSendLogin != null && s.xtream != null) {
+                                if (onSendLogin != null && s.canShare) {
                                     AppMenuItem(text = { Text(t("Send login to TV")) }, onClick = { menu = false; onSendLogin(s) })
                                 }
-                                if (onShareQr != null && s.xtream != null) {
+                                if (onShareQr != null && s.canShare) {
                                     AppMenuItem(text = { Text(t("Share with QR code")) }, onClick = { menu = false; onShareQr(s) })
                                 }
                                 AppMenuItem(text = { Text(t("Show logs")) }, onClick = { menu = false; onLogs() })

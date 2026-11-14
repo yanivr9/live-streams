@@ -117,6 +117,11 @@ object LinkReceiver {
 
         override fun logs(): String = Problems.report(app).also { Problems.markSeen(app) }
 
+        override fun playlist(url: String, name: String?) {
+            AppLog.i("link", "A phone sent a playlist link")
+            main.post { ChannelStore.get(app).startPlaylist(url, name) }
+        }
+
         override fun login(request: LoginRequest) {
             AppLog.i("link", "A phone sent a login for ${request.login.base}")
             main.post {

@@ -52,6 +52,9 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import org.json.JSONObject
 import java.io.File
 
+/** What a Livio QR code holds: an IPTV login, or a playlist link (M3U), with its name. */
+data class SharedAccount(val login: XtreamLogin?, val link: String?, val name: String?)
+
 /**
  * An account passed from one phone to another as a QR code (no link): streamdesk://login?d=<the login>&n=<its name>.
  * The friend's Livio reads it from a picture in the gallery, or the phone's own camera opens it in the app.
@@ -65,15 +68,37 @@ object LoginQr {
         return "streamdesk://login?d=$data$n"
     }
 
-    /** The login and its name from a QR code's text; null when it isn't a Livio account. */
-    fun parse(text: String?): Pair<XtreamLogin, String?>? {
+    /** A playlist link: streamdesk://login?l=<the link>&n=<its name>. */
+    fun encodeLink(link: String, name: String?): String {
+        val data = Base64.encodeToString(link.toByteArray(), FLAGS)
+        val n = name?.takeIf { it.isNotBlank() }?.let { "&n=" + Base64.encodeToString(it.toByteArray(), FLAGS) }.orEmpty()
+        return "streamdesk://login?l=$data$n"
+    }
+
+    /** The QR code for a saved account or playlist link; null when it can't be shared (a file opened on this phone). */
+    fun encode(source: PlaylistSource): String? = when {
+        source.xtream != null -> encode(source.xtream, source.name)
+        source.canShare -> encodeLink(source.url, source.name)
+        else -> null
+    }
+
+    /** The login and its name from a QR code's text; null when it isn't a Livio account (or it's a playlist link). */
+    fun parse(text: String?): Pair<XtreamLogin, String?>? = read(text)?.let { a -> a.login?.let { it to a.name } }
+
+    /** The login or playlist link, and its name, from a QR code's text; null when it isn't from Livio. */
+    fun read(text: String?): SharedAccount? {
         val uri = runCatching { Uri.parse(text?.trim() ?: return null) }.getOrNull() ?: return null
         if (uri.scheme != "streamdesk" || uri.host != "login") return null
         return runCatching {
+            val name = uri.getQueryParameter("n")?.let { String(Base64.decode(it, FLAGS)) }?.takeIf { it.isNotBlank() }
+            val link = uri.getQueryParameter("l")?.let { String(Base64.decode(it, FLAGS)).trim() }
+            if (link != null) {
+                if (!link.startsWith("http://", true) && !link.startsWith("https://", true)) return null
+                return SharedAccount(null, link, name)
+            }
             val login = XtreamLogin.fromJson(JSONObject(String(Base64.decode(uri.getQueryParameter("d"), FLAGS))))
             if (login.server.isBlank() || login.username.isBlank() || login.password.isBlank()) return null
-            val name = uri.getQueryParameter("n")?.let { String(Base64.decode(it, FLAGS)) }?.takeIf { it.isNotBlank() }
-            login to name
+            SharedAccount(login, null, name)
         }.getOrNull()
     }
 
@@ -156,8 +181,8 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
     val context = LocalContext.current
     // Shown over this window (the app's own messages appear behind it)
     val tell: (String) -> Unit = { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
-    val login = source.xtream ?: return
-    val text = remember(source) { LoginQr.encode(login, source.name) }
+    val text = remember(source) { LoginQr.encode(source) } ?: return
+    val login = source.xtream
     val qr = remember(text) { LoginQr.bitmap(text).asImageBitmap() }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -178,7 +203,7 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
                         }
                     }
                 }
-                Text("${source.name} · user ${login.username}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                Text(if (login != null) "${source.name} · user ${login.username}" else "${source.name} · ${linkHost(source.url)}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         OutlinedButton(onClick = {
@@ -191,7 +216,8 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
                     ) { Text("Send picture") }
                 }
                 Text(
-                    "🔒 The QR code holds the password. Send it only to the person whose account it is.",
+                    if (login != null) "🔒 The QR code holds the password. Send it only to the person whose account it is."
+                    else "🔒 The QR code holds the playlist link (it may include the password). Send it only to people you trust.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFFFFB4A9),
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF3A1F1C)).padding(10.dp),
@@ -204,14 +230,21 @@ fun ShareLoginDialog(source: PlaylistSource, onDismiss: () -> Unit, onDone: (Str
 
 /** The friend's phone, after reading the QR code: shows the account and adds it with one tap. */
 @Composable
-fun AddSharedLoginDialog(login: XtreamLogin, name: String?, onAdd: () -> Unit, onDismiss: () -> Unit) {
-    val host = remember(login) { runCatching { java.net.URI(login.base).let { it.host + if (it.port > 0) ":${it.port}" else "" } }.getOrDefault(login.server) }
+fun AddSharedLoginDialog(account: SharedAccount, onAdd: () -> Unit, onDismiss: () -> Unit) {
+    val login = account.login
+    val name = account.name
+    val rows = if (login != null) {
+        val host = runCatching { java.net.URI(login.base).let { it.host + if (it.port > 0) ":${it.port}" else "" } }.getOrDefault(login.server)
+        listOfNotNull(name?.let { "Name" to it }, "Server" to host, "Username" to login.username, "Password" to "••••••••")
+    } else {
+        listOfNotNull(name?.let { "Name" to it }, "Playlist" to linkHost(account.link.orEmpty()))
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add this account?") },
+        title = { Text(if (login != null) "Add this account?" else "Add this playlist?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOfNotNull(name?.let { "Name" to it }, "Server" to host, "Username" to login.username, "Password" to "••••••••").forEach { (k, v) ->
+                rows.forEach { (k, v) ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(v, fontWeight = FontWeight.SemiBold)
@@ -219,7 +252,10 @@ fun AddSharedLoginDialog(login: XtreamLogin, name: String?, onAdd: () -> Unit, o
                 }
             }
         },
-        confirmButton = { Button(onClick = onAdd, colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = FocusInk)) { Text("Add account") } },
+        confirmButton = { Button(onClick = onAdd, colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = FocusInk)) { Text(if (login != null) "Add account" else "Add playlist") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/** The site of a link ("play.example.com"), so the whole link (with any password in it) isn't shown. */
+fun linkHost(link: String): String = runCatching { java.net.URI(link.trim()).host }.getOrNull() ?: link.substringAfter("://").substringBefore('/')

@@ -26,6 +26,19 @@ class LoginQrTest {
     }
 
     @Test
+    fun playlistLinkRoundTrip() {
+        val link = "https://play.example.com/get.php?username=a&password=b&type=m3u_plus"
+        val source = PlaylistSource(link, "Orr")
+        val text = LoginQr.encode(source)!!
+        assertEquals(SharedAccount(null, link, "Orr"), LoginQr.read(text))
+        assertNull(LoginQr.parse(text))   // not a login
+        assertEquals(SharedAccount(login, null, "Yossi"), LoginQr.read(LoginQr.encode(login, "Yossi")))
+        assertNull(LoginQr.encode(PlaylistSource("content://downloads/1", "file")))   // a file on this phone can't be shared
+        assertNull(LoginQr.read(LoginQr.encodeLink("javascript:alert(1)", null)))
+        assertEquals(SharedAccount(null, link, "Orr"), LoginQr.read(LoginQr.decode(LoginQr.bitmap(text))))
+    }
+
+    @Test
     fun otherTextIsNotAnAccount() {
         assertNull(LoginQr.parse("https://example.com"))
         assertNull(LoginQr.parse("streamdesk://connect?host=192.168.1.5&code=123456"))

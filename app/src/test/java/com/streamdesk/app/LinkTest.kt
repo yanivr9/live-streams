@@ -16,6 +16,8 @@ class LinkTest {
         override fun play(queue: List<Channel>, index: Int) { played = queue to index }
         override fun command(action: String) { commands += action }
         override fun login(request: LoginRequest) { login = request }
+        var playlist: Pair<String, String?>? = null
+        override fun playlist(url: String, name: String?) { playlist = url to name }
         var nowPlaying: Pair<List<Channel>, Int>? = null
         override fun takeOver() = nowPlaying?.also { commands += "stop" }
         override fun logs() = "12:00 player Open \"Sport 1\""
@@ -87,6 +89,13 @@ class LinkTest {
         )
         LinkClient.sendLogin(tv, "123456", sent)
         assertEquals(sent, recorder.login)
+    }
+
+    @Test
+    fun playlistLinkArrives() {
+        LinkClient.sendPlaylist(tv, "123456", "https://play.example.com/get.php?u=a&p=b", "Orr")
+        assertEquals("https://play.example.com/get.php?u=a&p=b" to "Orr", recorder.playlist)
+        failsWith(LinkException.Kind.Other) { LinkClient.sendPlaylist(tv, "123456", "file:///sdcard/x.m3u", "Orr") }
     }
 
     @Test

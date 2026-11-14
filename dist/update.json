@@ -1,6 +1,6 @@
 {
-  "versionCode": 106,
-  "versionName": "3.85",
+  "versionCode": 107,
+  "versionName": "3.86",
   "apk": "StreamDesk.apk",
-  "notes": "Fix: Send picture and Save picture on Share with QR code work again"
+  "notes": "Share any playlist: a playlist link (not only a login) can now be shared with a QR code and sent to the TV (the TV needs 3.86 too)."
 }

@@ -55,6 +55,10 @@ data class PlaylistSource(
     val enabled: Boolean = true,
     val updateHours: Int = 24,   // 0 = only when asked
 ) {
+    /** A login, or a playlist on the web: both can be passed to a friend's phone (QR code) or to the TV. A file opened on this phone can't. */
+    val canShare: Boolean
+        get() = xtream != null || url.startsWith("http://", true) || url.startsWith("https://", true)
+
     fun toJson(): JSONObject = JSONObject()
         .put("url", url)
         .put("name", name)

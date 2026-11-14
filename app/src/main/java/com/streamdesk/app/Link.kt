@@ -40,6 +40,8 @@ interface LinkHandler {
     fun play(queue: List<Channel>, index: Int)
     fun command(action: String)
     fun login(request: LoginRequest)
+    /** A playlist link (M3U) sent from the phone, to add on the TV. */
+    fun playlist(url: String, name: String?) {}
     /** "Continue on phone": what the TV is playing (channels and position), and stop playing it. Null if nothing plays. */
     fun takeOver(): Pair<List<Channel>, Int>?
     /** The TV's activity log (passwords already hidden), so it can be read on the phone. */
@@ -132,7 +134,7 @@ class LinkServer(
         if (method == "GET" && path == "/ping") {
             return 200 to JSONObject().put("app", "streamdesk").put("name", deviceName).put("version", version)
         }
-        if (method != "POST" || path !in setOf("/play", "/command", "/login", "/takeover", "/logs")) return 404 to error("not found")
+        if (method != "POST" || path !in setOf("/play", "/command", "/login", "/playlist", "/takeover", "/logs")) return 404 to error("not found")
         authorize(given)?.let { return it }
         val json = runCatching { JSONObject(body) }.getOrNull() ?: return 400 to error("bad request")
         when (path) {
@@ -147,6 +149,11 @@ class LinkServer(
             "/takeover" -> {
                 val (queue, index) = handler.takeOver() ?: return 409 to error("nothing playing")
                 return 200 to JSONObject().put("index", index).put("queue", JSONArray().also { a -> queue.forEach { a.put(it.toJson()) } })
+            }
+            "/playlist" -> {
+                val url = json.optString("url").trim()
+                if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return 400 to error("no link")
+                handler.playlist(url, json.optString("name").ifBlank { null })
             }
             "/login" -> {
                 val login = json.optJSONObject("login")?.let(XtreamLogin::fromJson) ?: return 400 to error("no login")
@@ -287,6 +294,10 @@ object LinkClient {
             .put("updateHours", request.updateHours)
         request.sport?.let { body.put("sport", JSONObject().put("text", it.text).put("cap", it.cap.name)) }
         request("POST", device.host, device.port, "/login", code, body.toString())
+    }
+
+    fun sendPlaylist(device: TvDevice, code: String, url: String, name: String?) {
+        request("POST", device.host, device.port, "/playlist", code, JSONObject().put("url", url).put("name", name).toString())
     }
 
     private fun request(method: String, host: String, port: Int, path: String, code: String?, body: String): JSONObject {
