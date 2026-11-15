@@ -40,8 +40,29 @@ import androidx.compose.ui.zIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
+enum class CategoryKind { Local, Country, Remote }
+
 /** One entry of the All tab's category list. [key] is the channels' group ("" for channels without one, [ALL] for every channel). */
-data class Category(val key: String, val name: String, val count: Int, val favorite: Boolean) {
+data class Category(
+    val key: String,
+    val name: String,
+    val count: Int,
+    val favorite: Boolean,
+    val kind: CategoryKind = CategoryKind.Local,
+    /** A country's code (for [CategoryKind.Country]) or the provider folder (for [CategoryKind.Remote]). */
+    val code: String = "",
+    val remote: RemoteCategory? = null,
+) {
+    /** Whether it can have a star: only folders that are in the list. */
+    val canStar: Boolean get() = kind == CategoryKind.Local && key != ALL && key.isNotBlank()
+    val icon: String get() = if (kind == CategoryKind.Country) Countries.flag(code) else if (kind == CategoryKind.Remote) Categories.icon(name) else Categories.icon(key.ifEmpty { name })
+    /** The line under the name. */
+    val detail: String get() = when (kind) {
+        CategoryKind.Local -> channelsCount(count)
+        CategoryKind.Country -> if (count == 1) t("1 category") else t("%d categories").format(count)
+        CategoryKind.Remote -> t("Not loaded · tap to load")
+    }
+
     companion object {
         /** The "All channels" entry at the top of the list. */
         const val ALL = "\u0000all"
@@ -138,20 +159,29 @@ fun CategoryRow(category: Category, onClick: () -> Unit, onToggleFavorite: () ->
         Box(
             Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
-        ) { Text(Categories.icon(category.key.ifEmpty { category.name }), fontSize = 20.sp) }
+        ) { Text(category.icon, fontSize = 20.sp) }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(category.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 fontWeight = if (category.key == Category.ALL) FontWeight.SemiBold else FontWeight.Normal)
-            Text(channelsCount(category.count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(category.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (category.key != Category.ALL && category.key.isNotBlank()) {
+        if (category.kind == CategoryKind.Remote) {
+            Text(
+                "☁ " + t("Load"),
+                color = Color(0xFF7AB8FF),
+                fontSize = 12.sp,
+                modifier = Modifier.border(1.dp, Color(0xFF35506E), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        if (category.canStar) {
             IconButton(onClick = onToggleFavorite) {
                 if (category.favorite) Icon(Icons.Default.Star, contentDescription = t("Remove category from favorites"), tint = Amber)
                 else Icon(Icons.Outlined.StarBorder, contentDescription = t("Add category to favorites"))
             }
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (category.kind != CategoryKind.Remote) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -174,13 +204,14 @@ fun CategoryTile(category: Category, selected: Boolean, onClick: () -> Unit, mod
     ) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(Categories.icon(category.key.ifEmpty { category.name }), fontSize = 26.sp)
+                Text(category.icon, fontSize = 26.sp)
                 Spacer(Modifier.weight(1f))
                 if (category.favorite) Icon(Icons.Default.Star, contentDescription = t("Favorite category"), tint = Amber)
+                if (category.kind == CategoryKind.Remote) Text("☁", color = Color(0xFF7AB8FF), fontSize = 20.sp)
             }
             Column {
                 Text(category.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(channelsCount(category.count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(category.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -46,6 +46,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Checkbox
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -665,13 +668,72 @@ private fun HomeScreen(
     val categories = remember(scoped, favoriteCategories, section) {
         if (section == Section.All) Categories.build(scoped, favoriteCategories) else emptyList()
     }
-    // Only worth it when there's more than one group: otherwise the channels show straight away
-    val showCategories = section == Section.All && group == null && query.isBlank() && categories.size > 2
-    val inCategory = section == Section.All && group != null
+    // More countries: the provider's other live folders, by country, loaded only when one is opened
+    var country by rememberSaveable { mutableStateOf<String?>(null) }
+    var peek by remember { mutableStateOf<PeekState?>(null) }
+    val remoteAll by RemoteCategories.all.collectAsState()
+    LaunchedEffect(section, sources) { if (section == Section.All) sources.forEach { RemoteCategories.fetch(it) } }
+    LaunchedEffect(section) { if (section != Section.All) { country = null; peek = null } }
+    val remoteByCountry = remember(remoteAll, channels, sources) {
+        val live = remoteAll.filterKeys { url -> sources.any { it.url == url && RemoteCategories.eligible(it) } }
+        RemoteCategories.notLoaded(live, channels.mapTo(HashSet()) { it.group.trim() }).groupBy { Countries.of(it.name) }
+    }
+    val countryEntries = remember(remoteByCountry) {
+        Countries.sort(remoteByCountry.keys).map { code ->
+            Category("\u0000c:$code", Countries.name(code), remoteByCountry[code].orEmpty().size, false, CategoryKind.Country, code)
+        }
+    }
+    // Only worth it when there's more than one group (or other countries): otherwise the channels show straight away
+    val showCategories = section == Section.All && group == null && country == null && peek == null && query.isBlank() &&
+        (categories.size > 2 || countryEntries.isNotEmpty())
+    val inCountry = section == Section.All && country != null && peek == null && group == null
+    // The list of entries on screen: the categories (then the countries), or one country's folders
+    val catList: List<Category>? = when {
+        inCountry && query.isBlank() -> remoteByCountry[country].orEmpty().sortedBy { it.name.lowercase() }.map {
+            Category("\u0000r:${it.sourceUrl}#${it.id}", it.name, 0, false, CategoryKind.Remote, country.orEmpty(), it)
+        }
+        showCategories -> if (categories.size > 2) categories + countryEntries else listOf(categories.first()) + countryEntries
+        else -> null
+    }
+    val inCategory = section == Section.All && (group != null || peek != null || country != null)
     var lastCategory by rememberSaveable { mutableIntStateOf(0) }   // the remote goes back to the category it came from
+    var lastRemote by rememberSaveable { mutableIntStateOf(0) }
+    fun liveExt(url: String) = if (channels.any { it.source == url && it.kind == Kind.LIVE && it.url.endsWith(".m3u8") }) "m3u8" else "ts"
+    fun keepPeek(p: PeekState) {
+        store.keepCategory(p.category.sourceUrl, p.category.name, p.channels)
+        notify(t("%s added to your categories.").format(p.category.name.trim()))
+        peek = null; country = null; group = p.category.name.trim()
+    }
+    fun startPeek(rc: RemoteCategory, keep: Boolean = false) {
+        val source = sources.firstOrNull { it.url == rc.sourceUrl } ?: return
+        peek = PeekState(rc)
+        AppLog.i("tap", "load category ${rc.name}" + if (keep) " (keep)" else "")
+        scope.launch {
+            Watch.start(context, "peek", "Load the category ${rc.name}", 30_000)
+            try {
+                val list = RemoteCategories.load(source, rc, liveExt(rc.sourceUrl))
+                if (peek?.category == rc) {
+                    val done = PeekState(rc, list, loading = false, error = if (list.isEmpty()) t("This category has no channels.") else null)
+                    peek = done
+                    if (keep && list.isNotEmpty()) keepPeek(done)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.e("categories", "Couldn't load ${rc.name}", e)
+                Problems.record(context, "category", "Couldn't load the category ${rc.name}: ${e.message ?: "network error"}")
+                if (peek?.category == rc) peek = PeekState(rc, loading = false, error = t("Couldn't load it: %s").format(e.message ?: t("network error")))
+            } finally {
+                Watch.done("peek")
+            }
+        }
+    }
     fun openCategory(c: Category, index: Int) {
-        lastCategory = index
-        group = c.key
+        when (c.kind) {
+            CategoryKind.Local -> { lastCategory = index; group = c.key }
+            CategoryKind.Country -> { lastCategory = index; lastRemote = 0; country = c.code }
+            CategoryKind.Remote -> { lastRemote = index; c.remote?.let { startPeek(it) } }
+        }
         AppLog.i("tap", "category ${c.name}")
     }
     fun toggleCategory(c: Category) {
@@ -689,9 +751,9 @@ private fun HomeScreen(
         if (section != Section.Favorites) emptyList()
         else scoped.filter { it.favorite }.map { it.group.trim() }.filter { it.isNotBlank() }.distinct().sorted().takeIf { it.size > 1 }.orEmpty()
     }
-    val visible = remember(scoped, sportPicked, israelPicked, channels, recent, section, group, query, kindFilter) {
+    val visible = remember(scoped, sportPicked, israelPicked, channels, recent, section, group, query, kindFilter, peek) {
         val base = when (section) {
-            Section.All -> scoped
+            Section.All -> peek?.channels ?: scoped
             Section.Sport -> sportPicked
             Section.Israel -> israelPicked
             Section.Favorites -> scoped.filter { it.favorite }
@@ -709,7 +771,13 @@ private fun HomeScreen(
     // Back on ☰ → My playlists returns to the channels
     BackHandler(enabled = !isTv && section == Section.Playlists && !searchOpen) { section = Section.Sport }
     // Back from a category's channels returns to the categories
-    BackHandler(enabled = inCategory && !searchOpen) { group = null }
+    BackHandler(enabled = inCategory && !searchOpen) {
+        when {
+            peek != null -> peek = null
+            group != null -> group = null
+            else -> country = null
+        }
+    }
     val firstRowFocus = remember { FocusRequester() }
     // TV remote: the channel grid has its own selection (see HomeKeys); the tabs and buttons use Android's focus
     var tvInGrid by remember { mutableStateOf(true) }
@@ -722,8 +790,12 @@ private fun HomeScreen(
     val phoneTabs = remember { listOf(Section.Sport, Section.Israel, Section.Favorites, Section.All) }
     val tabRequesters = remember { List(tvTabs.size) { FocusRequester() } }
     LaunchedEffect(section, sourceFilter) { if (group == null) lastCategory = 0 }
-    LaunchedEffect(section, group, sourceFilter, query) {
-        tvSelected = if (section == Section.All && group == null) lastCategory else 0
+    LaunchedEffect(section, group, sourceFilter, query, country, peek?.category) {
+        tvSelected = when {
+            section != Section.All || group != null || peek != null -> 0
+            country != null -> lastRemote
+            else -> lastCategory
+        }
         tvInGrid = true
     }
 
@@ -846,10 +918,16 @@ private fun HomeScreen(
 
     // The remote's keys while the channel grid is the active part of the screen (see HomeKeys)
     val tvVisible by rememberUpdatedState(visible)
-    val tvCategories by rememberUpdatedState(if (showCategories) categories else null)
-    val tvOpenCategory by rememberUpdatedState<(Int) -> Unit> { i -> categories.getOrNull(i)?.let { openCategory(it, i) } }
+    val tvCategories by rememberUpdatedState(catList)
+    val tvOpenCategory by rememberUpdatedState<(Int) -> Unit> { i -> catList?.getOrNull(i)?.let { openCategory(it, i) } }
+    // Holding OK: a category's star, or on a provider folder, load it and keep it
     val tvStarCategory by rememberUpdatedState<(Int) -> Unit> { i ->
-        categories.getOrNull(i)?.takeIf { it.key != Category.ALL && it.key.isNotBlank() }?.let { toggleCategory(it) }
+        val c = catList?.getOrNull(i)
+        when {
+            c == null -> {}
+            c.canStar -> toggleCategory(c)
+            c.kind == CategoryKind.Remote && c.remote != null -> { lastRemote = i; startPeek(c.remote, keep = true) }
+        }
     }
     val tvColumns by rememberUpdatedState(tileCount.columns)
     val tvBlocked by rememberUpdatedState(dialog != null || moreMenu || section == Section.Playlists)
@@ -1113,17 +1191,37 @@ private fun HomeScreen(
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 } else if (inCategory) {
-                    // Inside a category: its name, a way back to the categories, and its star
-                    val current = categories.firstOrNull { it.key == group }
-                    val name = current?.name ?: if (group == Category.ALL) t("All channels") else group.orEmpty().ifBlank { t("Other") }
+                    // Inside a category (or a country, or a provider folder): its name, a way back, and its star
+                    val current = if (group != null) categories.firstOrNull { it.key == group } else null
+                    val p = peek
+                    val name = when {
+                        p != null -> p.category.name
+                        group == null -> Countries.flag(country.orEmpty()) + "  " + Countries.name(country.orEmpty())
+                        else -> current?.name ?: if (group == Category.ALL) t("All channels") else group.orEmpty().ifBlank { t("Other") }
+                    }
+                    val detail = when {
+                        p != null && p.loading -> t("Loading…")
+                        p != null -> channelsCount(p.channels.size)
+                        group == null -> catList?.firstOrNull()?.let { _ -> Category("", "", catList.size, false, CategoryKind.Country).detail }.orEmpty()
+                        else -> channelsCount(visible.size)
+                    }
                     Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (!isTv) IconButton(onClick = { group = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back to the categories")) }
+                        if (!isTv) IconButton(onClick = { if (peek != null) peek = null else if (group != null) group = null else country = null }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back to the categories"))
+                        }
                         else Spacer(Modifier.width(12.dp))
-                        Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                        Spacer(Modifier.width(8.dp))
-                        Text(channelsCount(visible.size), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.weight(1f))
-                        if (isTv) Text(t("Back: categories"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(Modifier.weight(1f)) {
+                            Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                        if (p != null && !p.loading && p.channels.isNotEmpty() && !isTv) {
+                            Button(onClick = { keepPeek(p) }, colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = Color.Black)) {
+                                Text("+ " + t("Keep in my list"), maxLines = 1)
+                            }
+                        } else if (isTv) Text(
+                            if (inCountry) t("OK: look · hold OK: keep in my list") else t("Back: categories"),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         else if (current != null && current.key != Category.ALL && current.key.isNotBlank()) {
                             IconButton(onClick = { toggleCategory(current) }) {
                                 if (current.favorite) Icon(Icons.Default.Star, contentDescription = t("Remove category from favorites"), tint = Amber)
@@ -1234,13 +1332,29 @@ private fun HomeScreen(
                     }
                 }
 
-                if (showCategories) {
-                    val favCount = categories.count { it.favorite }
+                val peekNow = peek
+                if (peekNow != null && (peekNow.loading || peekNow.error != null)) {
+                    Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Spacer(Modifier.height(48.dp))
+                        if (peekNow.loading) {
+                            CircularProgressIndicator(color = Amber)
+                            Spacer(Modifier.height(16.dp))
+                            Text(t("Loading %s…").format(peekNow.category.name), textAlign = TextAlign.Center)
+                        } else {
+                            Text(peekNow.error.orEmpty(), textAlign = TextAlign.Center)
+                            Spacer(Modifier.height(16.dp))
+                            OutlinedButton(onClick = { startPeek(peekNow.category) }, modifier = Modifier.tvFocusRing()) { Text(t("Try again")) }
+                        }
+                    }
+                } else if (catList != null) {
+                    val categories = catList
+                    val favCount = if (inCountry) 0 else categories.count { it.favorite }
+                    val firstCountry = categories.indexOfFirst { it.kind == CategoryKind.Country }
                     if (isTv) {
                         BoxWithConstraints(Modifier.weight(1f)) {
                             val gap = 12.dp
                             val rowHeight = ((maxHeight - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
-                            key(section, sourceFilter, kindFilter) {
+                            key(section, sourceFilter, kindFilter, country) {
                                 val gridState = rememberLazyGridState()
                                 LaunchedEffect(tvSelected, tvInGrid, tileCount) {
                                     if (tvInGrid) {
@@ -1272,11 +1386,23 @@ private fun HomeScreen(
                             }
                         }
                     } else {
-                        key(section, sourceFilter, kindFilter) {
+                        key(section, sourceFilter, kindFilter, country) {
                             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 96.dp)) {
                                 itemsIndexed(categories, key = { _, c -> c.key }) { i, c ->
-                                    if (i == 1 && favCount > 0) CategoryHeading("★ " + t("Favorite categories"))
-                                    if (i == 1 + favCount) CategoryHeading(t("All categories") + " · " + (categories.size - 1))
+                                    if (inCountry && i == 0) CategoryHeading(t("Tap a category to load its channels"))
+                                    if (!inCountry && i == 1 && favCount > 0 && c.kind == CategoryKind.Local) CategoryHeading("★ " + t("Favorite categories"))
+                                    if (!inCountry && i == 1 + favCount && c.kind == CategoryKind.Local) {
+                                        CategoryHeading(t("My categories") + " · " + categories.count { it.kind == CategoryKind.Local && it.key != Category.ALL })
+                                    }
+                                    if (i == firstCountry) {
+                                        CategoryHeading("🌍 " + t("More countries"))
+                                        Text(
+                                            t("On your provider, not loaded. Tap to look inside."),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+                                        )
+                                    }
                                     CategoryRow(c, onClick = { openCategory(c, i) }, onToggleFavorite = { toggleCategory(c) })
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                 }

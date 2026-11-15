@@ -264,6 +264,24 @@ class ChannelStore private constructor(context: Context) {
         return count
     }
 
+    /**
+     * Keeps a folder that was only being looked at: its channels join the account's list and its name joins the account's
+     * folders, so the next update brings it again. An account that loads every folder already has it.
+     */
+    fun keepCategory(url: String, name: String, channels: List<Channel>) {
+        val source = _sources.value.firstOrNull { it.url == url } ?: return
+        val login = source.xtream ?: return
+        val terms = login.categoryTerms
+        val clean = name.replace(',', ' ').trim()
+        if (terms.isNotEmpty() && terms.none { clean.contains(it, ignoreCase = true) }) {
+            val categories = (login.categories.split(',').map { it.trim() }.filter { it.isNotEmpty() } + clean).joinToString(", ")
+            putSource(source.copy(xtream = login.copy(categories = categories)))
+        }
+        val added = addAll(channels.map { it.copy(source = url) })
+        _sources.value.firstOrNull { it.url == url }?.let { s -> putSource(s.copy(channelCount = _channels.value.count { it.source == url })) }
+        AppLog.i("categories", "kept $clean: $added channels")
+    }
+
     /** Removes a playlist link and its channels. Favorites are kept as hand-added channels. */
     fun removePlaylist(url: String) {
         removed += url

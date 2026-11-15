@@ -276,6 +276,33 @@ object Xtream {
         }
     }
 
+    /** The account's live folders (id → name), without their channels: a few KB. */
+    suspend fun liveCategories(login: XtreamLogin, ua: String?): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        parseArray(fetchText(login.api("get_live_categories"), ua).text)
+            .map { it.optString("category_id").trim() to it.optString("category_name").trim() }
+            .filter { it.first.isNotEmpty() && it.second.isNotEmpty() }
+    }
+
+    /** One live folder's channels, asked for on its own (get_live_streams&category_id=…), with [name] as their group. */
+    suspend fun categoryChannels(login: XtreamLogin, ua: String?, id: String, name: String, liveExt: String): List<Channel> = withContext(Dispatchers.IO) {
+        val fetched = fetchText(login.api("get_live_streams", "&category_id=${enc(id)}"), ua)
+        val path = "${enc(login.username)}/${enc(login.password)}"
+        parseArray(fetched.text)
+            // Some servers ignore category_id and send everything: keep only this folder
+            .filter { it.optString("category_id").ifBlank { id } == id }
+            .mapNotNull { o ->
+                val sid = o.optString("stream_id").ifBlank { return@mapNotNull null }
+                Channel(
+                    url = "${login.base}live/$path/$sid.$liveExt",
+                    name = o.optString("name").ifBlank { "Channel $sid" },
+                    group = name,
+                    logo = webAddress(o.optString("stream_icon")),
+                    kind = Kind.LIVE,
+                    userAgent = if (fetched.userAgent == VLC_USER_AGENT) "" else fetched.userAgent,
+                )
+            }
+    }
+
     private fun parseObject(text: String): JSONObject? =
         text.trim().takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() }
 
