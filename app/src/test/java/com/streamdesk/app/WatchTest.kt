@@ -68,3 +68,14 @@ class WatchTest {
         assertEquals(2, Problems.all(context).size)
     }
 }
+
+/** A main thread waiting for work (the phone was asleep) isn't a freeze; one busy in the app's code is. */
+class FreezeIdleTest {
+    @org.junit.Test
+    fun idleMainThreadIsNotAFreeze() {
+        val idle = listOf(StackTraceElement("android.os.MessageQueue", "nativePollOnce", "MessageQueue.java", -2), StackTraceElement("android.os.Looper", "loop", "Looper.java", 416))
+        val busy = listOf(StackTraceElement("com.streamdesk.app.M3u", "parse", "M3u.kt", 40), StackTraceElement("android.os.Looper", "loop", "Looper.java", 416))
+        org.junit.Assert.assertTrue(FreezeWatch.isIdle(idle))
+        org.junit.Assert.assertFalse(FreezeWatch.isIdle(busy))
+    }
+}

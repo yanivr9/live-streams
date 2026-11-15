@@ -1,6 +1,6 @@
 {
-  "versionCode": 111,
-  "versionName": "3.90",
+  "versionCode": 112,
+  "versionName": "3.91",
   "apk": "StreamDesk.apk",
-  "notes": "Categories: All opens on your categories (tap one for its channels), star a category to keep it on top and in Favorites; on the TV, hold OK on a category to star it"
+  "notes": "Fix: no more false 'app stopped answering' reports after the phone was asleep or the app was in the background"
 }
