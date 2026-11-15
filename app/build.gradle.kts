@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 109
-        versionName = "3.88"
+        versionCode = 110
+        versionName = "3.89"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -99,3 +99,12 @@ dependencies {
     testImplementation("org.json:json:20240303")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
+
+// Livio for a browser (an iPad on the home Wi-Fi) is served by the TV box: the Windows app's pages (desktop/app) go
+// into the APK as assets/web/
+val copyWebApp by tasks.registering(Copy::class) {
+    from(rootProject.file("desktop/app"))
+    into(layout.buildDirectory.dir("generated/webapp/web"))
+}
+android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/webapp"))
+tasks.named("preBuild") { dependsOn(copyWebApp) }

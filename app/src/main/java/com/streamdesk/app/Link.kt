@@ -42,6 +42,8 @@ interface LinkHandler {
     fun login(request: LoginRequest)
     /** A playlist link (M3U) sent from the phone, to add on the TV. */
     fun playlist(url: String, name: String?) {}
+    /** The account the TV is signed in to, for Livio opened in a browser on the home network (an iPad). */
+    fun account(): XtreamLogin? = null
     /** "Continue on phone": what the TV is playing (channels and position), and stop playing it. Null if nothing plays. */
     fun takeOver(): Pair<List<Channel>, Int>?
     /** The TV's activity log (passwords already hidden), so it can be read on the phone. */
@@ -60,6 +62,10 @@ class LinkServer(
     private val code: () -> String,
     private val handler: LinkHandler,
     private val now: () -> Long = System::currentTimeMillis,
+    /** The web app's files (index.html, js/app.js, …) for browsers: http://<TV>:<port>/app/ */
+    private val files: ((String) -> ByteArray?)? = null,
+    /** Tests only: let the stream relay reach addresses on this machine and the home network. */
+    private val allowLocalTargets: Boolean = false,
 ) {
     private var socket: ServerSocket? = null
     private var pool: ExecutorService? = null
@@ -119,6 +125,9 @@ class LinkServer(
                     val host = (headers["host"] ?: c.localAddress.hostAddress.orEmpty()).substringBefore(':')
                     return respondHtml(c, connectPage(host, c.localPort, given))
                 }
+                // Livio in a browser (an iPad): its files, the TV's account, and the provider's lists and streams relayed
+                if (parts[0] == "GET" && (path == "/app" || path.startsWith("/app/"))) return serveApp(c, parts[1], path)
+                if (parts[0] == "GET" && path == "/p") return relay(c, parts[1])
                 val length = headers["content-length"]?.toIntOrNull() ?: 0
                 if (length < 0 || length > MAX_BODY) return respond(c, 413, error("too big"))
                 val body = if (length > 0) String(readBytes(input, length), Charsets.UTF_8) else ""
@@ -233,6 +242,7 @@ input:focus{outline:2px solid #ff9f1c;border-color:transparent}
 </form>
 <div class="msg" id="msg"></div>
 <p class="note">🔒 The details go straight to the TV over your Wi-Fi. They aren't sent anywhere else.</p>
+<div class="app">Want to watch on this iPad or phone?<br><a href="/app/?k=$code">Watch Livio here</a><br><span style="font-size:12px">Then Share → Add to Home Screen for a Livio icon.</span></div>
 <div class="app" id="app">Have Livio on an Android phone?<br><a href="$intent">Open Livio</a><br><br>Or in Livio: Send login to TV, and type <span class="c">$spaced</span></div>
 </div>
 <script>
@@ -264,6 +274,117 @@ function send(ev){
 }
 </script></body></html>"""
     }
+
+    private fun serveApp(c: Socket, target: String, path: String) {
+        if (path == "/app/account") {
+            authorize(queryParam(target, "k"))?.let { return respond(c, it.first, it.second) }
+            val login = handler.account() ?: return respond(c, 404, error("no account"))
+            return respond(c, 200, JSONObject().put("server", login.server).put("user", login.username).put("pass", login.password).put("folders", login.categories))
+        }
+        val files = files ?: return respond(c, 404, error("not found"))
+        if (path == "/app") {
+            val query = target.substringAfter('?', "")
+            val out = c.getOutputStream()
+            out.write("HTTP/1.1 302 Found\r\nLocation: /app/${if (query.isNotEmpty()) "?$query" else ""}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+            out.flush()
+            return
+        }
+        val name = path.removePrefix("/app/").ifEmpty { "index.html" }
+        if (name.split('/').any { it.isEmpty() || it == ".." || it.startsWith(".") }) return respond(c, 404, error("not found"))
+        val bytes = files(name) ?: return respond(c, 404, error("not found"))
+        val type = when (name.substringAfterLast('.').lowercase()) {
+            "html" -> "text/html; charset=utf-8"
+            "js" -> "application/javascript; charset=utf-8"
+            "css" -> "text/css; charset=utf-8"
+            "png" -> "image/png"
+            "svg" -> "image/svg+xml"
+            "json" -> "application/json"
+            else -> "application/octet-stream"
+        }
+        val out = c.getOutputStream()
+        out.write("HTTP/1.1 200 OK\r\nContent-Type: $type\r\nCache-Control: no-cache\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+        out.write(bytes)
+        out.flush()
+    }
+
+    /**
+     * Fetches a provider's list or stream for the browser and passes it on as it arrives (a live stream never ends,
+     * so it flows until the browser closes it). HLS playlists are rewritten so their parts come through here too.
+     * Only for whoever has the TV's code, and never towards the home network itself.
+     */
+    private fun relay(c: Socket, target: String) {
+        val key = queryParam(target, "k")
+        authorize(key)?.let { return respond(c, it.first, it.second) }
+        val link = queryParam(target, "u")
+        if (!link.startsWith("http://", true) && !link.startsWith("https://", true)) return respond(c, 400, error("bad link"))
+        var url = URL(link)
+        var conn: HttpURLConnection
+        var hops = 0
+        try {
+            while (true) {
+                if (!allowLocalTargets && isLocalHost(url.host)) return respond(c, 403, error("not allowed"))
+                conn = url.openConnection() as HttpURLConnection
+                conn.instanceFollowRedirects = false   // followed here, also from http to https, and each hop checked
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 25_000
+                conn.setRequestProperty("User-Agent", RELAY_AGENT)
+                val status = conn.responseCode
+                val location = conn.getHeaderField("Location")
+                if (status in 300..399 && location != null && hops < 5) {
+                    conn.disconnect()
+                    url = URL(url, location)
+                    hops++
+                    continue
+                }
+                break
+            }
+        } catch (e: IOException) {
+            return respond(c, 502, error("the provider didn't answer"))
+        }
+        val status = conn.responseCode
+        val type = conn.contentType ?: "application/octet-stream"
+        val body = (if (status >= 400) conn.errorStream else conn.inputStream)
+        val out = c.getOutputStream()
+        try {
+            val playlist = status < 400 && (type.contains("mpegurl", true) || url.path.endsWith(".m3u8", true))
+            if (playlist) {
+                val bytes = rewritePlaylist(body?.use { String(it.readBytes(), Charsets.UTF_8) }.orEmpty(), url, key).toByteArray(Charsets.UTF_8)
+                out.write("HTTP/1.1 $status OK\r\nContent-Type: application/vnd.apple.mpegurl\r\nCache-Control: no-store\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                out.write(bytes)
+            } else {
+                val length = conn.contentLengthLong
+                out.write(("HTTP/1.1 $status ${if (status < 400) "OK" else "Error"}\r\nContent-Type: $type\r\nCache-Control: no-store\r\n" +
+                    (if (length >= 0) "Content-Length: $length\r\n" else "") + "Connection: close\r\n\r\n").toByteArray())
+                body?.use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)   // the browser closing the stream ends this with an error, which is fine
+                    }
+                }
+            }
+            out.flush()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** The playlist with every address (parts, keys, other qualities) pointing back through [relay]. */
+    fun rewritePlaylist(text: String, base: URL, key: String): String = text.lines().joinToString("\n") { line ->
+        val t = line.trim()
+        when {
+            t.isEmpty() -> line
+            t.startsWith("#") -> URI_ATTRIBUTE.replace(line) { m -> "URI=\"" + relayed(URL(base, m.groupValues[1]).toString(), key) + "\"" }
+            else -> relayed(URL(base, t).toString(), key)
+        }
+    }
+
+    private fun relayed(link: String, key: String) = "/p?k=" + URLEncoder.encode(key, "UTF-8") + "&u=" + URLEncoder.encode(link, "UTF-8")
+
+    private fun isLocalHost(host: String): Boolean = runCatching {
+        java.net.InetAddress.getAllByName(host).any { it.isLoopbackAddress || it.isSiteLocalAddress || it.isLinkLocalAddress || it.isAnyLocalAddress }
+    }.getOrDefault(true)
 
     private fun htmlEscape(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
@@ -311,6 +432,8 @@ function send(ev){
     private companion object {
         const val MAX_BODY = 512 * 1024
         const val MAX_FAILURES = 5
+        const val RELAY_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
+        val URI_ATTRIBUTE = Regex("URI=\"([^\"]+)\"")
     }
 }
 

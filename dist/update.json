@@ -1,6 +1,6 @@
 {
-  "versionCode": 109,
-  "versionName": "3.88",
+  "versionCode": 110,
+  "versionName": "3.89",
   "apk": "StreamDesk.apk",
-  "notes": "Automatic problem watching: a channel that doesn't start after a tap or CH +/-, a TV guide or playlist that doesn't load, a failed send to the TV and app freezes are saved with the log of those moments. Send them with Send problem report."
+  "notes": "Livio on an iPad (or any phone/tablet browser) at home: the Android TV box serves it. Scan the TV's QR code (⋮ → Link a phone), tap Watch Livio here, then Share → Add to Home Screen."
 }

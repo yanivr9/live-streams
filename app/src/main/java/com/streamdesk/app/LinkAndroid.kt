@@ -63,7 +63,9 @@ object LinkReceiver {
         if (server != null) return
         val app = context.applicationContext
         val version = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull().orEmpty()
-        val s = LinkServer("Livio (${Build.MODEL})", version, { code(app) }, AndroidHandler(app))
+        // Livio for a browser (an iPad on the home Wi-Fi): the Windows/LG app's pages, packed into the APK under web/
+        val webFiles: (String) -> ByteArray? = { name -> runCatching { app.assets.open("web/$name").use { it.readBytes() } }.getOrNull() }
+        val s = LinkServer("Livio (${Build.MODEL})", version, { code(app) }, AndroidHandler(app), files = webFiles)
         val port = runCatching { s.start() }.getOrElse {
             AppLog.e("link", "Couldn't start the phone link", it)
             return
@@ -116,6 +118,9 @@ object LinkReceiver {
         }
 
         override fun logs(): String = Problems.report(app).also { Problems.markSeen(app) }
+
+        override fun account(): XtreamLogin? =
+            ChannelStore.get(app).sources.value.let { list -> list.firstOrNull { it.enabled && it.xtream != null } ?: list.firstOrNull { it.xtream != null } }?.xtream
 
         override fun playlist(url: String, name: String?) {
             AppLog.i("link", "A phone sent a playlist link")
