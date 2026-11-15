@@ -11,6 +11,7 @@ class App : Application() {
         super.onCreate()
         AppLog.init(filesDir)
         if (isTelevision()) LinkReceiver.start(this)
+        FreezeWatch.start(this)
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull()
         AppLog.i("app", "Started Livio $version on Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})")
         val previous = Thread.getDefaultUncaughtExceptionHandler()

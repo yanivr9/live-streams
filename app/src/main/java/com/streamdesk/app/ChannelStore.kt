@@ -103,6 +103,7 @@ class ChannelStore private constructor(context: Context) {
         }
         setProgress(url, "Downloading…")
         AppLog.i("playlist", "Start: $url")
+        Watch.start(appContext, "load:$url", "Load the playlist \"${name ?: existing?.name ?: playlistName(url)}\"", LOAD_WATCH_MS, kind = "slow")
         jobs.launch {
             try {
                 val count = loadPlaylist(url, name, prefetched)
@@ -119,6 +120,7 @@ class ChannelStore private constructor(context: Context) {
                 Problems.record(appContext, "playlist", "Couldn't load the playlist: ${describe(e)}")
                 if (!quiet) _events.emit(StoreEvent("Couldn't load the playlist: ${describe(e)}."))
             } finally {
+                Watch.done("load:$url")
                 setProgress(url, null)
             }
         }
@@ -153,6 +155,7 @@ class ChannelStore private constructor(context: Context) {
         if (url in _progress.value) return
         setProgress(url, "Signing in…")
         AppLog.i("signin", "Start: \"${source.name}\" at ${source.xtream?.base} (channels ${source.xtream?.live}, movies ${source.xtream?.movies}, series ${source.xtream?.series})")
+        Watch.start(appContext, "load:$url", "Sign in to \"${source.name}\" and load the channels", LOAD_WATCH_MS, kind = "slow")
         jobs.launch {
             try {
                 val count = loadXtream(source) { setProgress(url, it) }
@@ -168,6 +171,7 @@ class ChannelStore private constructor(context: Context) {
                 Problems.record(appContext, "sign-in", "Couldn't sign in: $msg")
                 if (!quiet) _events.emit(StoreEvent("Couldn't sign in: $msg."))
             } finally {
+                Watch.done("load:$url")
                 setProgress(url, null)
             }
         }
@@ -341,6 +345,8 @@ class ChannelStore private constructor(context: Context) {
 
     companion object {
         private const val FILE_CHANNELS = "channels.json"
+        /** A playlist or sign-in still loading after this long is written down as a problem. */
+        private const val LOAD_WATCH_MS = 120_000L
         private const val FILE_RECENT = "recent.json"
         private const val FILE_SOURCES = "playlists.json"
         private const val MAX_RECENT = 30

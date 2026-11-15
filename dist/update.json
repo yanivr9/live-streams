@@ -1,6 +1,6 @@
 {
-  "versionCode": 108,
-  "versionName": "3.87",
+  "versionCode": 109,
+  "versionName": "3.88",
   "apk": "StreamDesk.apk",
-  "notes": "iPhone + Android TV: scan the TV's QR code with any phone's camera, type the login or playlist link on the page that opens, and tap Send to TV."
+  "notes": "Automatic problem watching: a channel that doesn't start after a tap or CH +/-, a TV guide or playlist that doesn't load, a failed send to the TV and app freezes are saved with the log of those moments. Send them with Send problem report."
 }

@@ -233,7 +233,10 @@ class PlayerActivity : ComponentActivity() {
         // Every error the player ends up showing is written down for the problem report
         lifecycleScope.launch {
             snapshotFlow { status }.collect { s ->
-                if (s?.isError == true) Problems.record(this@PlayerActivity, "playback", "${current?.displayName() ?: "?"}: ${s.text}")
+                if (s?.isError == true) {
+                    Watch.done(WATCH_KEY)   // the error itself is the problem written down
+                    Problems.record(this@PlayerActivity, "playback", "${current?.displayName() ?: "?"}: ${s.text}")
+                }
             }
         }
         if (!isTv) {
@@ -385,6 +388,12 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Gave up waiting: closed the player while the channel still showed nothing
+        if (Watch.isWatching(WATCH_KEY)) {
+            Watch.done(WATCH_KEY)
+            val waited = (System.currentTimeMillis() - watchStartedAt) / 1000
+            if (waited >= 6) Problems.record(this, "no response", "Closed the player after $waited s: \"${current?.displayName() ?: "?"}\" never started")
+        }
         if (isTv) NowPlaying.clear()
         handler.removeCallbacksAndMessages(null)
         bannerHandler.removeCallbacksAndMessages(null)
@@ -430,9 +439,18 @@ class PlayerActivity : ComponentActivity() {
 
     private fun channelFor(url: String) = store.find(url) ?: Channel(url, nameFromUrl(url))
 
+    private var watchStartedAt = 0L
+
     private fun play(i: Int) {
+        val previous = current
         index = i
         val ch = queue[i]
+        // Nothing on screen 20 s after a tap or CH +/− is written down as a problem, with the log of those moments
+        if (castTarget == null) {
+            watchStartedAt = System.currentTimeMillis()
+            val what = if (previous == null) "Open \"${ch.displayName()}\"" else if (previous.url == ch.url) "Try \"${ch.displayName()}\" again" else "Switch from \"${previous.displayName()}\" to \"${ch.displayName()}\""
+            Watch.start(this, WATCH_KEY, what, WATCH_MS)
+        }
         if (isTv) NowPlaying.set(queue, i)
         startBackgroundService(ch.displayName())
         current = ch
@@ -514,7 +532,12 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun zap(delta: Int) {
-        if (queue.size < 2) return
+        if (queue.size < 2) {
+            // CH +/− with nothing to move to: say so instead of doing nothing
+            AppLog.i("tap", "CH ${if (delta > 0) "+" else "−"} with only one channel in the list")
+            android.widget.Toast.makeText(this, "There's only one channel in this list.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         val tv = castTarget
         if (tv != null) {
             // The TV changes channel; this phone only follows along so "Play here" starts on the same one
@@ -674,6 +697,7 @@ class PlayerActivity : ComponentActivity() {
                     status = null
                     retries = 0
                     reachedReady = true
+                    Watch.done(WATCH_KEY)
                     handler.removeCallbacks(startTimeout)
                 }
                 Player.STATE_ENDED -> if (liveLike()) reconnectLive("the stream ended") else status = Status("Finished playing.")
@@ -807,6 +831,7 @@ class PlayerActivity : ComponentActivity() {
             status = Status("The stream keeps stopping. Press OK or tap Try again, or check the internet connection.", isError = true)
             return
         }
+        if (retries == 0) Problems.record(this, "stall", "\"${current?.displayName() ?: "?"}\" stopped while playing ($reason)")
         retries++
         AppLog.i("player", "  $reason; reconnecting ($retries of $LIVE_MAX_RETRIES)")
         status = Status("Connection lost. Reconnecting…")
@@ -1288,6 +1313,8 @@ class PlayerActivity : ComponentActivity() {
         private const val BUSY_RETRY_MS = 4_000L
         private const val SWITCH_GAP_MS = 1_200L
         private const val START_TIMEOUT_MS = 15_000L
+        private const val WATCH_KEY = "player"
+        private const val WATCH_MS = 20_000L
         private const val STALL_SECONDS = 25
 
         private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)

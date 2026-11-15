@@ -41,6 +41,13 @@ object AppLog {
 
     fun text(): String = _lines.value.joinToString("\n")
 
+    /** The lines of the last [ms] milliseconds (at most [max] lines). */
+    fun recent(ms: Long, max: Int): String {
+        val cutoff = time.format(Date(System.currentTimeMillis() - ms))
+        // Lines start with "MM-dd HH:mm:ss.SSS", so they sort by time as text
+        return _lines.value.takeLast(max).filter { it.take(18) >= cutoff }.joinToString("\n")
+    }
+
     private fun add(tag: String, message: String) {
         val line = "${time.format(Date())} [$tag] ${redact(message)}"
         val all = synchronized(this) {

@@ -86,11 +86,19 @@ private fun rememberNow(): Long {
 fun ChannelGuideDialog(channel: Channel, login: XtreamLogin, onPlay: () -> Unit, onDismiss: () -> Unit) {
     var programs by remember { mutableStateOf<List<Program>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(channel.url) {
+        Watch.start(context, "guide", "Open the TV guide of \"${channel.displayName()}\"", 20_000)
         runCatching { GuideCache.get(login, channel) }
-            .onSuccess { programs = it }
-            .onFailure { error = "Couldn't load the guide: ${it.message ?: "no answer"}"; AppLog.e("guide", "Guide for ${channel.name} failed", it) }
+            .onSuccess { programs = it; Watch.done("guide") }
+            .onFailure {
+                Watch.done("guide")
+                error = "Couldn't load the guide: ${it.message ?: "no answer"}"
+                AppLog.e("guide", "Guide for ${channel.name} failed", it)
+                Problems.record(context, "guide", "TV guide of \"${channel.displayName()}\": ${it.message ?: "no answer"}")
+            }
     }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Watch.done("guide") } }
     val now = rememberNow()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

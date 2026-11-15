@@ -51,6 +51,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** What to send once a TV has been chosen. */
+/** What was asked of the TV, for the problem report. */
+fun tvJobName(job: TvJob): String = when (job) {
+    is TvJob.Play -> "Play on TV"
+    is TvJob.Login -> if (job.source.xtream != null) "Send login to TV" else "Send playlist to TV"
+    TvJob.TakeOver -> "Continue from TV"
+    TvJob.Logs -> "Problems from TV"
+}
+
 sealed interface TvJob {
     data class Play(val queue: List<Channel>, val index: Int) : TvJob
     data class Login(val source: PlaylistSource) : TvJob

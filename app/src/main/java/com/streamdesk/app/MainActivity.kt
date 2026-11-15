@@ -505,7 +505,7 @@ private fun HomeScreen(
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { LinkClient.logs(device, code) } }
                     .onSuccess { LinkPrefs.save(context, device.host, code); dialog = HomeDialog.TvLogs(device.name, it) }
-                    .onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+                    .onFailure { Problems.record(context, "tv", "${tvJobName(job)} → ${device.name}: ${it.message ?: "no answer"}"); notify(it.message ?: "Couldn't reach the TV.") }
             }
             return
         }
@@ -513,7 +513,7 @@ private fun HomeScreen(
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { LinkClient.takeOver(device, code) } }
                     .onSuccess { (queue, index) -> LinkPrefs.save(context, device.host, code); onPlay(queue, index, StreamFormat.Auto) }
-                    .onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+                    .onFailure { Problems.record(context, "tv", "${tvJobName(job)} → ${device.name}: ${it.message ?: "no answer"}"); notify(it.message ?: "Couldn't reach the TV.") }
             }
             return
         }
@@ -532,7 +532,7 @@ private fun HomeScreen(
             result.onSuccess {
                 LinkPrefs.save(context, device.host, code)
                 notify(if (job is TvJob.Login) (if (job.source.xtream != null) "Login sent to ${device.name}." else "Playlist sent to ${device.name}.") else "Playing on ${device.name}.")
-            }.onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+            }.onFailure { Problems.record(context, "tv", "${tvJobName(job)} → ${device.name}: ${it.message ?: "no answer"}"); notify(it.message ?: "Couldn't reach the TV.") }
         }
     }
 
@@ -545,7 +545,7 @@ private fun HomeScreen(
                 LinkPrefs.save(context, device.host, invite.code)
                 if (source != null) runTvJob(TvJob.Login(source), device, invite.code)
                 else notify("Connected to ${device.name}. Tap ⋮ on a channel, then Play on TV.")
-            }.onFailure { notify(it.message ?: "Couldn't reach the TV.") }
+            }.onFailure { Problems.record(context, "tv", "Connect to ${device.name} (QR code): ${it.message ?: "no answer"}"); notify(it.message ?: "Couldn't reach the TV.") }
         }
     }
 
