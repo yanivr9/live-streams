@@ -1,6 +1,6 @@
 {
-  "versionCode": 110,
-  "versionName": "3.89",
+  "versionCode": 111,
+  "versionName": "3.90",
   "apk": "StreamDesk.apk",
-  "notes": "Livio on an iPad (or any phone/tablet browser) at home: the Android TV box serves it. Scan the TV's QR code (⋮ → Link a phone), tap Watch Livio here, then Share → Add to Home Screen."
+  "notes": "Categories: All opens on your categories (tap one for its channels), star a category to keep it on top and in Favorites; on the TV, hold OK on a category to star it"
 }

@@ -660,8 +660,34 @@ private fun HomeScreen(
     // The guide on every channel: each row or tile asks for its own now/next as it shows (see NowOn)
     val guides by NowOn.guides.collectAsState()
     val nowSeconds = rememberNowSeconds()
+    // The All tab opens on its categories (the playlist's groups): tap one for its channels, ★ keeps it at the top
+    val favoriteCategories by remember { FavoriteCategories.load(context) }.collectAsState()
+    val categories = remember(scoped, favoriteCategories, section) {
+        if (section == Section.All) Categories.build(scoped, favoriteCategories) else emptyList()
+    }
+    // Only worth it when there's more than one group: otherwise the channels show straight away
+    val showCategories = section == Section.All && group == null && query.isBlank() && categories.size > 2
+    val inCategory = section == Section.All && group != null
+    var lastCategory by rememberSaveable { mutableIntStateOf(0) }   // the remote goes back to the category it came from
+    fun openCategory(c: Category, index: Int) {
+        lastCategory = index
+        group = c.key
+        AppLog.i("tap", "category ${c.name}")
+    }
+    fun toggleCategory(c: Category) {
+        val on = FavoriteCategories.toggle(context, c.key)
+        notify((if (on) t("★ %s added to favorites.") else t("%s removed from favorites.")).format(c.name))
+    }
+    // Favorites shows the starred categories above the starred channels
+    val favoriteCategoryList = remember(scoped, favoriteCategories, section) {
+        if (section == Section.Favorites && favoriteCategories.isNotEmpty()) {
+            val all = channels.filter { it.source !in turnedOff }
+            Categories.build(all, favoriteCategories).filter { it.favorite }
+        } else emptyList()
+    }
     val groups = remember(scoped, section) {
-        if (section == Section.Sport || section == Section.Israel) emptyList() else scoped.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
+        if (section != Section.Favorites) emptyList()
+        else scoped.filter { it.favorite }.map { it.group.trim() }.filter { it.isNotBlank() }.distinct().sorted().takeIf { it.size > 1 }.orEmpty()
     }
     val visible = remember(scoped, sportPicked, israelPicked, channels, recent, section, group, query, kindFilter) {
         val base = when (section) {
@@ -672,7 +698,7 @@ private fun HomeScreen(
             Section.Playlists -> emptyList()
         }
         base.filter {
-            (group == null || it.group == group) &&
+            Categories.matches(it, group) &&
                 (query.isBlank() || it.name.contains(query, true) || it.url.contains(query, true) || it.group.contains(query, true))
         }
     }
@@ -682,6 +708,8 @@ private fun HomeScreen(
     val isTv = LocalIsTv.current
     // Back on ☰ → My playlists returns to the channels
     BackHandler(enabled = !isTv && section == Section.Playlists && !searchOpen) { section = Section.Sport }
+    // Back from a category's channels returns to the categories
+    BackHandler(enabled = inCategory && !searchOpen) { group = null }
     val firstRowFocus = remember { FocusRequester() }
     // TV remote: the channel grid has its own selection (see HomeKeys); the tabs and buttons use Android's focus
     var tvInGrid by remember { mutableStateOf(true) }
@@ -693,7 +721,11 @@ private fun HomeScreen(
     // The phone's tabs; the playlists are in ☰ → My playlists
     val phoneTabs = remember { listOf(Section.Sport, Section.Israel, Section.Favorites, Section.All) }
     val tabRequesters = remember { List(tvTabs.size) { FocusRequester() } }
-    LaunchedEffect(section, group, sourceFilter, query) { tvSelected = 0; tvInGrid = true }
+    LaunchedEffect(section, sourceFilter) { if (group == null) lastCategory = 0 }
+    LaunchedEffect(section, group, sourceFilter, query) {
+        tvSelected = if (section == Section.All && group == null) lastCategory else 0
+        tvInGrid = true
+    }
 
     val isTvMenu = LocalIsTv.current
     // The ⋮ entries, shown as a menu on a TV and as a panel from the bottom on a phone
@@ -814,6 +846,11 @@ private fun HomeScreen(
 
     // The remote's keys while the channel grid is the active part of the screen (see HomeKeys)
     val tvVisible by rememberUpdatedState(visible)
+    val tvCategories by rememberUpdatedState(if (showCategories) categories else null)
+    val tvOpenCategory by rememberUpdatedState<(Int) -> Unit> { i -> categories.getOrNull(i)?.let { openCategory(it, i) } }
+    val tvStarCategory by rememberUpdatedState<(Int) -> Unit> { i ->
+        categories.getOrNull(i)?.takeIf { it.key != Category.ALL && it.key.isNotBlank() }?.let { toggleCategory(it) }
+    }
     val tvColumns by rememberUpdatedState(tileCount.columns)
     val tvBlocked by rememberUpdatedState(dialog != null || moreMenu || section == Section.Playlists)
     val tvSection by rememberUpdatedState(section)
@@ -832,7 +869,9 @@ private fun HomeScreen(
             val arrow = code == android.view.KeyEvent.KEYCODE_DPAD_UP || code == android.view.KeyEvent.KEYCODE_DPAD_DOWN ||
                 code == android.view.KeyEvent.KEYCODE_DPAD_LEFT || code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
             val list = tvVisible
-            if (tvBlocked || list.isEmpty() || !(ok || arrow)) return@handler false
+            val cats = tvCategories
+            val count = cats?.size ?: list.size
+            if (tvBlocked || count == 0 || !(ok || arrow)) return@handler false
             val down = e.action == android.view.KeyEvent.ACTION_DOWN
             if (!tvInGrid) {
                 // On the tabs and buttons Android's focus does the work, except ▼, which goes down into the channels
@@ -843,10 +882,10 @@ private fun HomeScreen(
                 return@handler false
             }
             val cols = tvColumns
-            val cur = tvSelected.coerceIn(0, list.size - 1)
+            val cur = tvSelected.coerceIn(0, count - 1)
             if (down) {
                 when (code) {
-                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> tvSelected = GridMoves.down(cur, cols, list.size)
+                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> tvSelected = GridMoves.down(cur, cols, count)
                     android.view.KeyEvent.KEYCODE_DPAD_UP -> {
                         val up = GridMoves.up(cur, cols)
                         if (up != null) tvSelected = up
@@ -857,16 +896,22 @@ private fun HomeScreen(
                         }
                     }
                     android.view.KeyEvent.KEYCODE_DPAD_LEFT -> tvSelected = GridMoves.left(cur, cols)
-                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> tvSelected = GridMoves.right(cur, cols, list.size)
+                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> tvSelected = GridMoves.right(cur, cols, count)
                     else -> when (e.repeatCount) {
                         0 -> tvOkDown = true
-                        1 -> if (tvOkDown) { tvOkDown = false; tvMenuSignal++ }   // holding OK: the channel's options
+                        // holding OK: the channel's options, or on a category its star
+                        1 -> if (tvOkDown) { tvOkDown = false; if (cats != null) tvStarCategory(cur) else tvMenuSignal++ }
                     }
                 }
             } else if (ok && tvOkDown) {
                 tvOkDown = false
-                AppLog.i("keys", "  OK on ${list[cur].displayName()}")
-                tvOpen(cur)
+                if (cats != null) {
+                    AppLog.i("keys", "  OK on category ${cats[cur].name}")
+                    tvOpenCategory(cur)
+                } else {
+                    AppLog.i("keys", "  OK on ${list[cur].displayName()}")
+                    tvOpen(cur)
+                }
             }
             true
         }
@@ -1067,6 +1112,25 @@ private fun HomeScreen(
                         Text(t("My playlists"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                } else if (inCategory) {
+                    // Inside a category: its name, a way back to the categories, and its star
+                    val current = categories.firstOrNull { it.key == group }
+                    val name = current?.name ?: if (group == Category.ALL) t("All channels") else group.orEmpty().ifBlank { t("Other") }
+                    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!isTv) IconButton(onClick = { group = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t("Back to the categories")) }
+                        else Spacer(Modifier.width(12.dp))
+                        Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        Spacer(Modifier.width(8.dp))
+                        Text(channelsCount(visible.size), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.weight(1f))
+                        if (isTv) Text(t("Back: categories"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        else if (current != null && current.key != Category.ALL && current.key.isNotBlank()) {
+                            IconButton(onClick = { toggleCategory(current) }) {
+                                if (current.favorite) Icon(Icons.Default.Star, contentDescription = t("Remove category from favorites"), tint = Amber)
+                                else Icon(Icons.Outlined.StarBorder, contentDescription = t("Add category to favorites"))
+                            }
+                        }
+                    }
                 } else if (!isTv) {
                     // Where you are: the tab's name and how many channels it shows (after a search, how many matched)
                     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp), verticalAlignment = Alignment.Bottom) {
@@ -1153,7 +1217,73 @@ private fun HomeScreen(
                     }
                 }
 
-                if (visible.isEmpty()) {
+                if (favoriteCategoryList.isNotEmpty() && query.isBlank()) {
+                    CategoryHeading(t("Categories"))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(favoriteCategoryList, key = { it.key }) { c ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { section = Section.All; sourceFilter = null; group = c.key; lastCategory = 0 },
+                                label = { Text(Categories.icon(c.key) + "  " + c.name + " · " + c.count, maxLines = 1) },
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Amber),
+                            )
+                        }
+                    }
+                }
+
+                if (showCategories) {
+                    val favCount = categories.count { it.favorite }
+                    if (isTv) {
+                        BoxWithConstraints(Modifier.weight(1f)) {
+                            val gap = 12.dp
+                            val rowHeight = ((maxHeight - 16.dp - gap * (tileCount.rows - 1)) / tileCount.rows).coerceAtLeast(72.dp)
+                            key(section, sourceFilter, kindFilter) {
+                                val gridState = rememberLazyGridState()
+                                LaunchedEffect(tvSelected, tvInGrid, tileCount) {
+                                    if (tvInGrid) {
+                                        val columns = tileCount.columns
+                                        val row = tvSelected.coerceIn(0, categories.size - 1) / columns
+                                        val firstRow = (row - (tileCount.rows - 1) / 2).coerceAtLeast(0)
+                                        if (gridState.firstVisibleItemIndex / columns != firstRow || gridState.firstVisibleItemScrollOffset != 0) {
+                                            gridState.animateScrollToItem(firstRow * columns)
+                                        }
+                                    }
+                                }
+                                LazyVerticalGrid(
+                                    state = gridState,
+                                    columns = GridCells.Fixed(tileCount.columns),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(gap),
+                                    verticalArrangement = Arrangement.spacedBy(gap),
+                                ) {
+                                    itemsIndexed(categories, key = { _, c -> c.key }) { i, c ->
+                                        CategoryTile(
+                                            category = c,
+                                            selected = tvInGrid && tvSelected.coerceIn(0, categories.size - 1) == i,
+                                            onClick = { openCategory(c, i) },
+                                            modifier = Modifier.height(rowHeight),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        key(section, sourceFilter, kindFilter) {
+                            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 96.dp)) {
+                                itemsIndexed(categories, key = { _, c -> c.key }) { i, c ->
+                                    if (i == 1 && favCount > 0) CategoryHeading("★ " + t("Favorite categories"))
+                                    if (i == 1 + favCount) CategoryHeading(t("All categories") + " · " + (categories.size - 1))
+                                    CategoryRow(c, onClick = { openCategory(c, i) }, onToggleFavorite = { toggleCategory(c) })
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
+                            }
+                        }
+                    }
+                } else if (visible.isEmpty()) {
                     EmptyState(section, filtered = query.isNotBlank() || group != null)
                 } else if (isTv) {
                     // The tiles are sized so exactly [tileCount] fit on the screen: the rows share the height
