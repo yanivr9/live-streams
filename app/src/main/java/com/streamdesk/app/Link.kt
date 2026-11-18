@@ -222,11 +222,16 @@ input:focus{outline:2px solid #ff9f1c;border-color:transparent}
 .note{font-size:13px;color:#9aa5ab;line-height:1.5;text-align:center;margin-top:16px}
 .app{border-top:1px solid #2a3135;margin-top:26px;padding-top:18px;text-align:center;font-size:14px;color:#9aa5ab}
 .app a{display:inline-block;margin-top:10px;padding:11px 22px;border:1px solid #ff9f1c;border-radius:999px;color:#ff9f1c;font-weight:600;text-decoration:none}
+.top .go{text-align:center;text-decoration:none;margin-top:0}
+.or{display:flex;align-items:center;gap:10px;color:#6f7a80;font-size:13px;margin:18px 0 14px}.or:before,.or:after{content:"";flex:1;border-top:1px solid #2a3135}
 .c{font:700 22px monospace;color:#ff9f1c;letter-spacing:2px}.hide{display:none}
 </style></head>
 <body><div class="w">
 <div class="logo">Livi<b>o</b></div>
 <h2>Send your channels to $tv</h2>
+<div class="top" id="app"><a class="go" href="$intent">Send from the Livio app</a>
+<div class="note" style="margin-top:8px">Livio on this phone? One tap sends your account to the TV.</div>
+<div class="or">or type the details</div></div>
 <div class="seg"><button id="t0" class="on" onclick="mode(0)">Login</button><button id="t1" onclick="mode(1)">Playlist link</button></div>
 <form id="f" onsubmit="send(event)" autocomplete="off">
 <div id="m0">
@@ -243,11 +248,11 @@ input:focus{outline:2px solid #ff9f1c;border-color:transparent}
 <div class="msg" id="msg"></div>
 <p class="note">🔒 The details go straight to the TV over your Wi-Fi. They aren't sent anywhere else.</p>
 <div class="app">Want to watch on this iPad or phone?<br><a href="/app/?k=$code">Watch Livio here</a><br><span style="font-size:12px">Then Share → Add to Home Screen for a Livio icon.</span></div>
-<div class="app" id="app">Have Livio on an Android phone?<br><a href="$intent">Open Livio</a><br><br>Or in Livio: Send login to TV, and type <span class="c">$spaced</span></div>
+<div class="app" id="app2">The TV's code, if Livio asks for it: <span class="c">$spaced</span></div>
 </div>
 <script>
 var CODE="$code",m=0;
-if(/iPhone|iPad|iPod/.test(navigator.userAgent))document.getElementById("app").className="hide";
+if(/iPhone|iPad|iPod/.test(navigator.userAgent)){document.getElementById("app").className="hide";document.getElementById("app2").className="hide"}
 function el(i){return document.getElementById(i)}
 function mode(n){m=n;el("t0").className=n?"":"on";el("t1").className=n?"on":"";el("m0").className=n?"hide":"";el("m1").className=n?"":"hide";say("","")}
 function say(t,c){var e=el("msg");e.textContent=t;e.className="msg "+c}

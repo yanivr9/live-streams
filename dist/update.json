@@ -1,6 +1,6 @@
 {
-  "versionCode": 116,
-  "versionName": "3.95",
+  "versionCode": 117,
+  "versionName": "3.96",
   "apk": "StreamDesk.apk",
-  "notes": "The activity log, crashes and freezes now also go to Sentry (passwords hidden), so problems can be looked at from anywhere"
+  "notes": "TV's QR page: a big 'Send from the Livio app' button at the top for Android phones"
 }
