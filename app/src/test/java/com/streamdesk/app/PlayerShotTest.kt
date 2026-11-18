@@ -16,7 +16,9 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
-class PlayerShotTest {
+open class PlayerShotTest {
+    open val file = "player.png"
+
     @Test
     fun phonePlayer() {
         val dir = System.getProperty("qashots")?.let(::File)
@@ -33,8 +35,14 @@ class PlayerShotTest {
                 val v = a.window.decorView
                 val b = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
                 v.draw(android.graphics.Canvas(b))
-                File(dir!!, "player.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                File(dir!!, file).outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
             }
         }
     }
 }
+
+/** The same sideways: the guide bar sits small in the bottom corner. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+class PlayerShotSidewaysTest : PlayerShotTest() { override val file = "player-land.png" }

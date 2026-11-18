@@ -43,50 +43,56 @@ fun GuideBar(info: GuideBannerInfo, modifier: Modifier = Modifier, compact: Bool
     val ch = info.channel
     val air = info.air
     val shape = RoundedCornerShape(if (compact) 18.dp else 24.dp)
-    val roomForNext = maxWidth >= 760.dp   // on a narrower screen the guide for "now" gets all the room
+    val roomForNext = !compact && maxWidth >= 760.dp   // on a narrower screen the guide for "now" gets all the room
     Row(
         Modifier
             .fillMaxWidth()
             .padding(start = if (compact) 12.dp else 48.dp, end = if (compact) 12.dp else 48.dp, bottom = if (compact) 0.dp else 40.dp)
             .background(Color(0xC20E1113), shape)
             .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
-            .padding(horizontal = if (compact) 14.dp else 24.dp, vertical = if (compact) 12.dp else 18.dp),
+            .padding(horizontal = if (compact) 12.dp else 24.dp, vertical = if (compact) 8.dp else 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 22.dp),
     ) {
         // Logo on a white card, as it is on the tiles; the number when the channel has none
-        Box(Modifier.size(if (compact) 56.dp else 96.dp).clip(RoundedCornerShape(if (compact) 12.dp else 16.dp)).background(Color.White), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(if (compact) 44.dp else 96.dp).clip(RoundedCornerShape(if (compact) 12.dp else 16.dp)).background(Color.White), contentAlignment = Alignment.Center) {
             if (ch.logo.startsWith("http") || ch.logo.startsWith("file:///android_asset/")) {
-                AsyncImage(model = ch.logo, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().padding(8.dp))
+                AsyncImage(model = ch.logo, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().padding(if (compact) 5.dp else 8.dp))
             } else {
-                Text("${info.number}", color = FocusInk, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
+                Text("${info.number}", color = FocusInk, fontWeight = FontWeight.Bold, style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineMedium)
             }
         }
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
                 Text(
-                    "${info.number}", color = FocusInk, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.background(Amber, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 1.dp),
+                    "${info.number}", color = FocusInk, fontWeight = FontWeight.ExtraBold,
+                    style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.background(Amber, RoundedCornerShape(if (compact) 7.dp else 10.dp)).padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 1.dp),
                 )
-                Text(ch.displayName(), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                Row(Modifier.background(OnAir, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(7.dp).background(Color.White, CircleShape))
-                    Spacer(Modifier.width(6.dp))
-                    Text("LIVE", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                Text(ch.displayName(), color = Color.White, fontWeight = FontWeight.Bold,
+                    style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Row(Modifier.background(OnAir, RoundedCornerShape(6.dp)).padding(horizontal = if (compact) 6.dp else 8.dp, vertical = if (compact) 1.dp else 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(if (compact) 5.dp else 7.dp).background(Color.White, CircleShape))
+                    Spacer(Modifier.width(if (compact) 4.dp else 6.dp))
+                    Text("LIVE", color = Color.White, fontWeight = FontWeight.Bold, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium)
                 }
             }
             if (air?.title != null) {
-                Text(air.title, color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(air.title, color = Color.White, fontWeight = FontWeight.SemiBold,
+                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleLarge,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = if (compact) 2.dp else 6.dp))
+                Row(Modifier.padding(top = if (compact) 5.dp else 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp)) {
                     LinearProgressIndicator(
                         progress = { air.progress ?: 0f },
                         color = Amber, trackColor = Color.White.copy(alpha = 0.22f),
-                        modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(6.dp)),
+                        modifier = Modifier.weight(1f).height(if (compact) 4.dp else 6.dp).clip(RoundedCornerShape(6.dp)),
                     )
-                    Text("until ${air.until ?: ""}  ·  ${info.number}/${info.total}", color = Color.White.copy(alpha = 0.72f), style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Text("until ${air.until ?: ""}  ·  ${info.number}/${info.total}", color = Color.White.copy(alpha = 0.72f),
+                        style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.titleSmall, maxLines = 1)
                 }
             } else {
-                Text("No guide for this channel", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
+                Text("No guide for this channel", color = Color.White.copy(alpha = 0.6f),
+                    style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = if (compact) 2.dp else 6.dp))
             }
         }
         if (roomForNext && air?.nextTitle != null) {

@@ -1,6 +1,6 @@
 {
-  "versionCode": 113,
-  "versionName": "3.92",
+  "versionCode": 114,
+  "versionName": "3.93",
   "apk": "StreamDesk.apk",
-  "notes": "More countries: All lists the provider's other countries without loading them; open a category to load just its channels, and Keep in my list to add it"
+  "notes": "Phone player: a smaller guide bar (in the bottom corner when sideways), shown for 5 seconds"
 }

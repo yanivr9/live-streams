@@ -17,6 +17,7 @@ import android.os.Looper
 import android.util.Rational
 import android.view.View
 import android.widget.Toast
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -1018,14 +1019,24 @@ class PlayerActivity : ComponentActivity() {
                 val guides by NowOn.guides.collectAsState()
                 val ch = current
                 val nowSeconds = rememberNowSeconds()
+                // The guide shows for GUIDE_PHONE_MS with the controls, even when the player keeps its controls up longer
+                // (while a channel starts, it does)
+                var guideShown by remember { mutableStateOf(false) }
+                LaunchedEffect(controlsVisible, index) {
+                    guideShown = controlsVisible
+                    if (controlsVisible) { delay(GUIDE_PHONE_MS); guideShown = false }
+                }
+                // Sideways the picture is short: a narrow bar in the bottom corner, clear of the pause button in the middle
+                val sideways = LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
                 AnimatedVisibility(
-                    visible = controlsVisible && ch != null && castTarget == null,
+                    visible = guideShown && ch != null && castTarget == null,
                     enter = fadeIn() + slideInVertically { it / 2 },
                     exit = fadeOut() + slideOutVertically { it / 2 },
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(if (sideways) Alignment.BottomStart else Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                        .padding(bottom = 96.dp),   // above the player's own bar at the bottom
+                        .padding(bottom = if (sideways) 84.dp else 96.dp)   // above the player's own bar at the bottom
+                        .then(if (sideways) Modifier.fillMaxWidth(0.46f).widthIn(max = 380.dp) else Modifier),
                 ) {
                     if (ch != null) GuideBar(GuideBannerInfo(ch, index + 1, queue.size, NowNext.of(guides[ch.url], nowSeconds)), compact = true)
                 }
@@ -1315,6 +1326,8 @@ class PlayerActivity : ComponentActivity() {
         private const val START_TIMEOUT_MS = 15_000L
         private const val WATCH_KEY = "player"
         private const val WATCH_MS = 20_000L
+        /** How long the phone shows the guide bar after the controls come up. */
+        private const val GUIDE_PHONE_MS = 5_000L
         private const val STALL_SECONDS = 25
 
         private val LINK = Regex("""(https?|rtsp|rtmp)://\S+""", RegexOption.IGNORE_CASE)
