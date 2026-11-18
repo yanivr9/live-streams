@@ -17,11 +17,11 @@ import android.os.Looper
 import android.util.Rational
 import android.view.View
 import android.widget.Toast
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -1026,8 +1026,10 @@ class PlayerActivity : ComponentActivity() {
                     guideShown = controlsVisible
                     if (controlsVisible) { delay(GUIDE_PHONE_MS); guideShown = false }
                 }
-                // Sideways the picture is short: a narrow bar in the bottom corner, clear of the pause button in the middle
-                val sideways = LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
+                // Sideways the picture is short: a narrow bar in the bottom corner, clear of the pause button in the middle.
+                // Measured from the player's own size, which is right whatever the phone reports about its orientation
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                val sideways = maxWidth > maxHeight
                 AnimatedVisibility(
                     visible = guideShown && ch != null && castTarget == null,
                     enter = fadeIn() + slideInVertically { it / 2 },
@@ -1039,6 +1041,7 @@ class PlayerActivity : ComponentActivity() {
                         .then(if (sideways) Modifier.fillMaxWidth(0.46f).widthIn(max = 380.dp) else Modifier),
                 ) {
                     if (ch != null) GuideBar(GuideBannerInfo(ch, index + 1, queue.size, NowNext.of(guides[ch.url], nowSeconds)), compact = true)
+                }
                 }
             }
 

@@ -1,6 +1,6 @@
 {
-  "versionCode": 114,
-  "versionName": "3.93",
+  "versionCode": 115,
+  "versionName": "3.94",
   "apk": "StreamDesk.apk",
-  "notes": "Phone player: a smaller guide bar (in the bottom corner when sideways), shown for 5 seconds"
+  "notes": "Phone player: the guide bar sits in the bottom corner whenever the picture is wider than tall"
 }
