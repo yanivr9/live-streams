@@ -12,8 +12,8 @@ android {
         applicationId = "com.streamdesk.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 115
-        versionName = "3.94"
+        versionCode = 116
+        versionName = "3.95"
     }
 
     // Keep every build signed with the same key, so a new version always installs over the old one
@@ -50,6 +50,7 @@ android {
             System.getProperty("qa")?.let { dir -> it.systemProperty("qa", dir) }   // QA walk-through pictures, on request
             System.getProperty("compat")?.let { dir -> it.systemProperty("compat", dir) }   // compatibility-matrix pictures, on request
             System.getProperty("qashots")?.let { dir -> it.systemProperty("qashots", dir) }   // phone screen pictures for a look-over, on request
+            System.getProperty("sentrycheck")?.let { text -> it.systemProperty("sentrycheck", text) }   // one real line to Sentry, on request
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
         }
     }
@@ -85,6 +86,9 @@ dependencies {
     // Compiles the app's startup code ahead of time when it's installed from a file (no Play Store), for a faster first open
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // The activity log, crashes and freezes go to Sentry (SentryLogs.kt). The core library only: the app has no
+    // native code of its own, so no NDK crash handler or session replay to carry
+    implementation("io.sentry:sentry-android-core:8.63.0")
 }
 
 dependencies {

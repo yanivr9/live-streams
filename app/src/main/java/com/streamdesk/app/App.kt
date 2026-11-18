@@ -9,6 +9,8 @@ import java.io.File
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        // First: the log lines below and any crash then reach Sentry too (its crash handler sits under the app's own)
+        SentryLogs.start(this)
         AppLog.init(filesDir)
         if (isTelevision()) LinkReceiver.start(this)
         FreezeWatch.start(this)

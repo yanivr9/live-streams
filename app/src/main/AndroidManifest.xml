@@ -24,6 +24,9 @@
         android:theme="@style/Theme.StreamDesk"
         android:usesCleartextTraffic="true">
 
+        <!-- Sentry is started by App.kt with the app's own settings (SentryLogs.kt), not by itself -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
+
         <service
             android:name=".PlaybackService"
             android:exported="false"

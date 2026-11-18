@@ -29,10 +29,10 @@ object AppLog {
         synchronized(this) { _lines.value = earlier + _lines.value }
     }
 
-    fun i(tag: String, message: String) = add(tag, message)
+    fun i(tag: String, message: String) = add(tag, message, isError = false)
 
     fun e(tag: String, message: String, error: Throwable? = null) =
-        add(tag, "ERROR " + message + (error?.let { " (${it.javaClass.simpleName}: ${it.message})" } ?: ""))
+        add(tag, "ERROR " + message + (error?.let { " (${it.javaClass.simpleName}: ${it.message})" } ?: ""), isError = true)
 
     fun clear() {
         synchronized(this) { _lines.value = emptyList() }
@@ -48,11 +48,13 @@ object AppLog {
         return _lines.value.takeLast(max).filter { it.take(18) >= cutoff }.joinToString("\n")
     }
 
-    private fun add(tag: String, message: String) {
-        val line = "${time.format(Date())} [$tag] ${redact(message)}"
+    private fun add(tag: String, message: String, isError: Boolean) {
+        val text = redact(message)
+        val line = "${time.format(Date())} [$tag] $text"
         val all = synchronized(this) {
             (_lines.value + line).takeLast(MAX_LINES).also { _lines.value = it }
         }
+        SentryLogs.send(tag, text, isError)
         val f = file ?: return
         writer.execute { runCatching { f.writeText(all.joinToString("\n", postfix = "\n")) } }
     }

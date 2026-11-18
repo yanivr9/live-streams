@@ -30,6 +30,7 @@ Open a network stream by link, like VLC's "Open Network Stream", and keep a chan
   send the login.
 - **Problem reports**: crashes, channels that end on an error, and failed sign-ins or playlist downloads are written down on each device (passwords hidden). The phone shows "Livio had a problem – Send report" and ⋮ → Send problem report opens Android's share menu with the report; the TV's report reaches the phone through ⋮ → Problems from TV.
 - **Logs from TV**: on the phone, ⋮ → Logs from TV shows the TV's activity log (passwords hidden) with a Copy button, since copying on a TV box goes nowhere.
+- **Logs in Sentry**: every line of the activity log (passwords hidden) also goes to Sentry, project `livio` (organization `yaniv-4r`): sentry.io → Explore → Logs, with `device.kind` (phone or tv) and the line's tag (`log.tag`: net, player, …). Crashes and freezes (ANRs) show up under Issues, with addresses redacted the same way. Debug builds report as environment `debug`, installed builds as `production`; the screen tests send nothing (`SentryLogs.kt`).
 - **Continue on phone**: ⋮ → Continue from TV on the phone (or Play here on the phone's remote screen) stops the TV and carries on
   with the same channel on the phone, so only one screen uses the account at a time.
 - **Sound with the screen off** (phone): the channel's sound keeps playing when the screen turns off or you leave the app. A notification shows the channel with a Stop button. ⋮ → Sound with the screen off turns it off, and then a live stream is closed when the app is left.
@@ -102,3 +103,4 @@ For the Play Store you need a release build signed with your own key (`./gradlew
 | `GuideUi.kt` | Guide tab and a channel's schedule |
 | `Update.kt`, `UpdateUi.kt` | In-app update: check, download, install |
 | `Resume.kt` | Open on the last channel (TV) |
+| `Log.kt`, `SentryLogs.kt` | The activity log on the device, and the same lines plus crashes sent to Sentry |
