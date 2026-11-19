@@ -1,6 +1,6 @@
 {
-  "versionCode": 117,
-  "versionName": "3.96",
+  "versionCode": 118,
+  "versionName": "3.97",
   "apk": "StreamDesk.apk",
-  "notes": "TV's QR page: a big 'Send from the Livio app' button at the top for Android phones"
+  "notes": "Settings: the Language row fits on one line (Phone · עב · ENG)"
 }

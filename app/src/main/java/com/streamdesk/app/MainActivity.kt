@@ -1662,7 +1662,7 @@ private fun HomeScreen(
                           Lang.set(context, LangMode.entries[(Lang.mode.ordinal + 1) % LangMode.entries.size])
                           if (Lang.hebrew != wasHebrew) { reopenSettings = true; (context as? android.app.Activity)?.recreate() }
                       }) {
-                          DrawerSegments(listOf(t("Phone"), "עברית", "English"), Lang.mode.ordinal) {
+                          DrawerSegments(listOf(t("Phone"), "עב", "ENG"), Lang.mode.ordinal) {
                               val wasHebrew = Lang.hebrew
                               Lang.set(context, LangMode.entries[it])
                               // A new direction needs the screen rebuilt; Settings opens again straight after

@@ -47,7 +47,7 @@ class SettingsLookTest {
                     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         DrawerSection("Look", divider = false)
                         DrawerRow(Icons.Default.DarkMode, "Theme", {}) { DrawerSegments(listOf("Phone", "Dark", "Light"), 0) {} }
-                        DrawerRow(Icons.Default.Language, "Language", {}) { DrawerSegments(listOf("Phone", "עברית", "English"), 2) {} }
+                        DrawerRow(Icons.Default.Language, "Language", {}) { DrawerSegments(listOf("Phone", "עב", "ENG"), 2) {} }
                         DrawerRow(Icons.Default.SignalCellularAlt, "Lower quality on mobile data", {}) { DrawerSwitch(true) {} }
                         DrawerRow(Icons.Default.PictureInPictureAlt, "Small window when leaving", {}) { DrawerSwitch(true) {} }
                         DrawerRow(Icons.Default.UnfoldMore, "CH + / − buttons on the picture", {}) { DrawerSwitch(true) {} }
